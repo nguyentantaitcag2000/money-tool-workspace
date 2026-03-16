@@ -1,69 +1,66 @@
 # 0. GLOBAL CONSTANTS
 
-# Ensure all Telegram operations target this ID
-
 TARGET_GROUP_ID = "-866483066"
-
-# Marker text
-
 MARKER_TEXT = "#SUCCESS_MARKER_GYM_V2#"
 
-# 1. VARIABLE DEFINITION
+# 1. PRE-PROCESSING (REQUISITES)
 
-# Triggered after successful execution of download-files.py
+# Critical: Must be completed BEFORE any script execution.
 
-NEW_DOWNLOAD_COMPLETED = true
+1. **Fetch YouTube Data**: Get the latest video from "Talilow" channel.
+2. **Extract Info**:
+* `LATEST_TITLE` = Full title of the latest video.
+* `MAX_DAY` = The highest number after the word "Day" in `LATEST_TITLE`.
+* `SUFFIX` = Everything in `LATEST_TITLE` after the first " - " (dash).
 
-IF NEW_DOWNLOAD_COMPLETED:
-# Logic: Date count from filenames determines single vs. double day title
-VIDEO_FILES = <files in telegram-skills/videos>
-UNIQUE_DATES = unique(<extract date from VIDEO_FILES>)
-DATE_COUNT = len(UNIQUE_DATES)
 
-```
-# Logic: YouTube determines the starting number sequence
-LATEST_TITLE = <latest title from Talilow YouTube channel>
-MAX_DAY = max(<integers after "Day" in LATEST_TITLE>)
+3. **Calculate Schedule**:
+* `BASE_DATE` = `publishAt` date of the latest video.
+* `NEXT_PUB_UTC` = (`BASE_DATE` + 1 day) at 09:00 (Asia/Ho_Chi_Minh) -> Convert to ISO UTC.
 
-NEXT_START = MAX_DAY + 1
-IF DATE_COUNT == 1:
-    DAY_LABEL = "Day " + NEXT_START
-ELSE:
-    # If multiple dates found in batch, increment for a range title
-    DAY_LABEL = "Day " + NEXT_START + ", " + (NEXT_START + 1)
 
-SUFFIX = substring of LATEST_TITLE after "-"
-TITLE_VIDEO = DAY_LABEL + " - " + SUFFIX
 
-```
+# 2. EXECUTION STEPS
 
-# 2. PUBLISH RULE
+### Step 1: Cleanup & Prep
 
-LATEST_YT = <latest video from Talilow>
-BASE_DATE = LATEST_YT.publishAt OR LATEST_YT.publishedAt
-NEXT_PUB_UTC = (BASE_DATE + 1 day) at 09:00 (Asia/Ho_Chi_Minh) -> UTC ISO format
+* `rm -rf telegram-skills/videos && mkdir -p telegram-skills/videos`
+* `rm -f edit-video/final-gym.mp4`
 
-# 3. EXECUTION STEPS
+### Step 2: Download
 
-1. **Cleanup**:
-`rm -rf telegram-skills/videos && mkdir -p telegram-skills/videos`
-`rm -f edit-video/final-gym.mp4`
-2. **Download**: In `telegram-skills`, run:
-`python download-files.py --group-id={TARGET_GROUP_ID} --marker-text={MARKER_TEXT}`
-3. **Sync**:
-`rm -rf edit-video/config-edit-video-with-scene/folder_videos && mkdir -p edit-video/config-edit-video-with-scene/folder_videos`
-Link (or copy) all files from `telegram-skills/videos` to `edit-video/config-edit-video-with-scene/folder_videos`.
+* In `telegram-skills`, run: `python download-files.py --group-id={TARGET_GROUP_ID} --marker-text={MARKER_TEXT}`
 
-3.5 **Validation**:
-Count files in `telegram-skills/videos` (N1) and `edit-video/config-edit-video-with-scene/folder_videos` (N2).
-**IF N1 != N2 or N1 == 0**: STOP execution and report error. Only proceed if N1 == N2 and N1 > 0.
+### Step 3: Sync & Strict Validation
 
-4. **Process**: In `edit-video`, run:
+* `rm -rf edit-video/config-edit-video-with-scene/folder_videos && mkdir -p edit-video/config-edit-video-with-scene/folder_videos`
+* Link/Copy all files from `telegram-skills/videos` to `edit-video/config-edit-video-with-scene/folder_videos`.
+* **CHECK**: Count files in both folders.
+**IF Count_Source != Count_Destination OR Count_Source == 0**: STOP and report error.
+
+### Step 4: Dynamic Labeling
+
+* `UNIQUE_DATES` = unique dates extracted from filenames in `telegram-skills/videos`.
+* `NEXT_START` = `MAX_DAY` + 1.
+* **IF** `len(UNIQUE_DATES)` == 1: `{DAY_LABEL}` = "Day " + `NEXT_START`.
+* **ELSE**: `{DAY_LABEL}` = "Day " + `NEXT_START` + ", " + (`NEXT_START` + 1).
+* `{TITLE_VIDEO}` = `{DAY_LABEL}` + " - " + `{SUFFIX}`.
+
+### Step 5: Process Video
+
+* In `edit-video`, run:
 `caffeinate python edit-video-gym.py config-edit-video-with-scene/folder_videos config-edit-video-with-scene/folder_audios --output final-gym.mp4 --skip 8 --texts '[{"text": "{DAY_LABEL}","start":2,"duration":5,"font_size":120,"x":"(w-text_w)/2","y":"(h-text_h)/2"}]'`
-5. **Upload**: Post `final-gym.mp4` to YouTube (Talilow).
-* Title: `{TITLE_VIDEO}` | Playlist: `Becoming a Better Me`
-* Schedule: `{NEXT_PUB_UTC}` | Privacy: `private`.
 
+### Step 6: Upload to YouTube
 
-6. **Notify**: Use your Telegram tool to send message to `TARGET_GROUP_ID`:
-"Task Complete. {MARKER_TEXT}"
+* Upload `final-gym.mp4` to "Talilow" channel.
+* **Settings**: Title: `{TITLE_VIDEO}` | Schedule: `{NEXT_PUB_UTC}` | Privacy: `private`.
+* **Important**: Capture the `VIDEO_ID` of this new upload.
+
+### Step 7: Add to Playlist (Post-Upload)
+
+* Add the video (`VIDEO_ID` from Step 6) to playlist: `Becoming a Better Me`.
+
+### Step 8: Notify
+
+* Send Telegram message to `TARGET_GROUP_ID`: "Task Complete. {MARKER_TEXT}"
