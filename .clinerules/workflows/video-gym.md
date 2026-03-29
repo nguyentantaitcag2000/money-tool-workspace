@@ -29,7 +29,7 @@ MARKER_TEXT = "#SUCCESS_MARKER_GYM_V2#"
 
 ### Step 2: Download
 
-* In `telegram-skills`, run: `python download-files.py --group-id={TARGET_GROUP_ID} --marker-text={MARKER_TEXT}`
+* In `telegram-skills`, run: `caffeinate python download-files.py --group-id={TARGET_GROUP_ID} --marker-text={MARKER_TEXT}`
 
 ### Step 3: Sync & Strict Validation
 
