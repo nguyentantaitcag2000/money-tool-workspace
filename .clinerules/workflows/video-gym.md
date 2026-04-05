@@ -1,7 +1,11 @@
-# 0. GLOBAL CONSTANTS
+# 0. GLOBAL CONSTANTS & PREPARATION
 
-TARGET_GROUP_ID = "-866483066"
-MARKER_TEXT = "#SUCCESS_MARKER_GYM_V2#"
+TARGET_GROUP_ID="-866483066"
+MARKER_TEXT="#SUCCESS_MARKER_GYM_V2#"
+
+# Keep Mac awake
+caffeinate -u -t 3600 &
+
 
 # 1. PRE-PROCESSING (REQUISITES)
 
@@ -24,43 +28,117 @@ MARKER_TEXT = "#SUCCESS_MARKER_GYM_V2#"
 
 ### Step 1: Cleanup & Prep
 
-* `rm -rf telegram-skills/videos && mkdir -p telegram-skills/videos`
-* `rm -f edit-video/final-gym.mp4`
+rm -rf telegram-skills/videos && mkdir -p telegram-skills/videos
+rm -f edit-video/final-gym.mp4
+rm -f edit-video/final-with-lazy.mp4
+rm -f edit-video/lazytyping.mp4
+
 
 ### Step 2: Download
 
-* In `telegram-skills`, run: `caffeinate python download-files.py --group-id={TARGET_GROUP_ID} --marker-text={MARKER_TEXT}`
+cd telegram-skills
+python download-files.py --group-id=${TARGET_GROUP_ID} --marker-text=${MARKER_TEXT}
+cd ..
 
-### Step 3: Sync & Strict Validation
 
-* `rm -rf edit-video/config-edit-video-with-scene/folder_videos && mkdir -p edit-video/config-edit-video-with-scene/folder_videos`
-* Link/Copy all files from `telegram-skills/videos` to `edit-video/config-edit-video-with-scene/folder_videos`.
-* **CHECK**: Count files in both folders.
-**IF Count_Source != Count_Destination OR Count_Source == 0**: STOP and report error.
+### Step 3: Split lazytyping & normal videos
+
+LAZY_VIDEO=$(ls telegram-skills/videos | grep -i "lazytyping" | head -n 1)
+
+rm -rf edit-video/config-edit-video-with-scene/folder_videos
+mkdir -p edit-video/config-edit-video-with-scene/folder_videos
+
+SOURCE_COUNT=0
+
+for file in telegram-skills/videos/*; do
+    filename=$(basename "$file")
+
+    if [[ "$filename" == *lazytyping* ]]; then
+        echo "👉 Found lazytyping video: $filename"
+        cp "$file" edit-video/lazytyping.mp4
+    else
+        cp "$file" edit-video/config-edit-video-with-scene/folder_videos/
+        ((SOURCE_COUNT++))
+    fi
+done
+
+DEST_COUNT=$(ls edit-video/config-edit-video-with-scene/folder_videos | wc -l)
+
+# STRICT CHECK
+if [[ $SOURCE_COUNT -ne $DEST_COUNT || $SOURCE_COUNT -eq 0 ]]; then
+    echo "❌ ERROR: Video count mismatch or no valid videos"
+    exit 1
+fi
+
 
 ### Step 4: Dynamic Labeling
 
-* `UNIQUE_DATES` = unique dates extracted from filenames in `telegram-skills/videos`.
-* `NEXT_START` = `MAX_DAY` + 1.
-* **IF** `len(UNIQUE_DATES)` == 1: `{DAY_LABEL}` = "Day " + `NEXT_START`.
-* **ELSE**: `{DAY_LABEL}` = "Day " + `NEXT_START` + ", " + (`NEXT_START` + 1).
-* `{TITLE_VIDEO}` = `{DAY_LABEL}` + " - " + `{SUFFIX}`.
+UNIQUE_DATES=$(ls telegram-skills/videos | grep -v lazytyping | sed -E 's/.*([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/' | sort | uniq)
+DATE_COUNT=$(echo "$UNIQUE_DATES" | wc -l)
 
-### Step 5: Process Video
+NEXT_START=$((MAX_DAY + 1))
 
-* In `edit-video`, run:
-`caffeinate python edit-video-gym.py config-edit-video-with-scene/folder_videos config-edit-video-with-scene/folder_audios --output final-gym.mp4 --skip 8 --texts '[{"text": "{DAY_LABEL}","start":2,"duration":5,"font_size":120,"x":"(w-text_w)/2","y":"(h-text_h)/2"}]'`
+if [[ $DATE_COUNT -eq 1 ]]; then
+    DAY_LABEL="Day ${NEXT_START}"
+else
+    DAY_LABEL="Day ${NEXT_START}, $((NEXT_START + 1))"
+fi
 
-### Step 6: Upload to YouTube
+TITLE_VIDEO="${DAY_LABEL} - ${SUFFIX}"
 
-* Upload `final-gym.mp4` to "Talilow" channel.
-* **Settings**: Title: `{TITLE_VIDEO}` | Schedule: `{NEXT_PUB_UTC}` | Privacy: `private`.
-* **Important**: Capture the `VIDEO_ID` of this new upload.
 
-### Step 7: Add to Playlist (Post-Upload)
+### Step 5: Process Video (MAIN VIDEO)
 
-* Add the video (`VIDEO_ID` from Step 6) to playlist: `Becoming a Better Me`.
+cd edit-video
 
-### Step 8: Notify
+python edit-video-gym.py \
+config-edit-video-with-scene/folder_videos \
+config-edit-video-with-scene/folder_audios \
+--output final-gym.mp4 \
+--skip 8 \
+--trim-end 1 \
+--texts "[{\"text\": \"${DAY_LABEL}\",\"start\":2,\"duration\":5,\"font_size\":120,\"x\":\"(w-text_w)/2\",\"y\":\"(h-text_h)/2\"}]"
 
-* Send Telegram message to `TARGET_GROUP_ID`: "Task Complete. {MARKER_TEXT}"
+
+### Step 6: Concat lazytyping (if exists)
+
+if [[ -f "lazytyping.mp4" ]]; then
+    echo "🎬 Concatenating lazytyping video..."
+
+    python3 concat-videos.py final-gym.mp4 lazytyping.mp4
+
+    # giả sử script output là output.mp4
+    mv output.mp4 final-with-lazy.mp4
+
+    FINAL_VIDEO="final-with-lazy.mp4"
+else
+    echo "⚠️ No lazytyping video found"
+    FINAL_VIDEO="final-gym.mp4"
+fi
+
+cd ..
+
+
+### Step 7: Upload to YouTube
+
+# Upload $FINAL_VIDEO
+# Title: $TITLE_VIDEO
+# Schedule: $NEXT_PUB_UTC
+# Privacy: private
+
+# Capture VIDEO_ID
+
+
+### Step 8: Add to Playlist
+
+# Add VIDEO_ID to playlist: Becoming a Better Me
+
+
+### Step 9: Notify & Cleanup
+
+cd telegram-skills
+python send-message.py --group-id=${TARGET_GROUP_ID} --message="Task Complete. ${MARKER_TEXT}"
+cd ..
+
+# Optional
+killall caffeinate

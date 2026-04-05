@@ -1,0 +1,2 @@
+- Khi có thực hiện liên quan đến authenticate youtube thì hãy dùng domain `localhost` (không port)
+- Không cần tạo file workflow gì cả
