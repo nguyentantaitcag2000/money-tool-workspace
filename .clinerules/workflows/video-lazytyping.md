@@ -1,14 +1,13 @@
 # 0. GLOBAL CONSTANTS & PREPARATION
 
-TARGET_GROUP_ID="-866483066"
-MARKER_TEXT="#SUCCESS_MARKER_GYM_V2#"
-
+TARGET_GROUP_ID="-5200249717"
+MARKER_TEXT="#SUCCESS_MARKER_LAZYTYPING_V1#"
 
 # 1. PRE-PROCESSING (REQUISITES)
 
 # Critical: Must be completed BEFORE any script execution.
 
-1. **Fetch YouTube Data**: Get the latest uploaded video from the playlist **"Becoming a Better Me"** on the "Talilow" channel.
+1. **Fetch YouTube Data**: Get the latest uploaded video from the playlist **"My Journey to Master 10-Finger Typing - LazyTyping"** on the "Talilow" channel.
 2. **Extract Info**:
 * `LATEST_TITLE` = Full title of the latest video.
 * `MAX_DAY` = The highest number after the word "Day" in `LATEST_TITLE`.
@@ -21,26 +20,28 @@ MARKER_TEXT="#SUCCESS_MARKER_GYM_V2#"
 
 
 
-# 2. EXECUTION STEPS
-
-### Step 1: Cleanup & Prep
+# =========================================
+# 2. CLEANUP
+# =========================================
 
 rm -rf telegram-skills/videos && mkdir -p telegram-skills/videos
-rm -f edit-video/final-gym.mp4
+rm -f edit-video/final-lazy.mp4
 rm -f edit-video/final-with-lazy.mp4
 rm -f edit-video/lazytyping.mp4
 
 
-### Step 2: Download
+# =========================================
+# 3. DOWNLOAD
+# =========================================
 
 cd telegram-skills
 python download-files.py --group-id=${TARGET_GROUP_ID} --marker-text=${MARKER_TEXT}
 cd ..
 
 
-### Step 3: Split lazytyping & normal videos
-
-LAZY_VIDEO=$(ls telegram-skills/videos | grep -i "lazytyping" | head -n 1)
+# =========================================
+# 4. SPLIT VIDEO
+# =========================================
 
 rm -rf edit-video/config-edit-video-with-scene/folder_videos
 mkdir -p edit-video/config-edit-video-with-scene/folder_videos
@@ -61,14 +62,13 @@ done
 
 DEST_COUNT=$(ls edit-video/config-edit-video-with-scene/folder_videos | wc -l)
 
-# STRICT CHECK
 if [[ $SOURCE_COUNT -ne $DEST_COUNT || $SOURCE_COUNT -eq 0 ]]; then
     echo "❌ ERROR: Video count mismatch or no valid videos"
     exit 1
 fi
 
 
-### Step 4: Dynamic Labeling
+### Step 5: Dynamic Labeling
 
 UNIQUE_DATES=$(ls telegram-skills/videos | grep -v lazytyping | sed -E 's/.*([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/' | sort | uniq)
 DATE_COUNT=$(echo "$UNIQUE_DATES" | wc -l)
@@ -84,56 +84,53 @@ fi
 TITLE_VIDEO="${DAY_LABEL} - ${SUFFIX}"
 
 
-### Step 5: Process Video (MAIN VIDEO)
+# =========================================
+# 6. EDIT VIDEO (MAIN)
+# =========================================
 
 cd edit-video
 
 python edit-video-gym.py \
 config-edit-video-with-scene/folder_videos \
 config-edit-video-with-scene/folder_audios \
---output final-gym.mp4 \
---skip 8 \
+--output final-lazy.mp4 \
+--skip 5 \
 --trim-end 1 \
 --texts "[{\"text\": \"${DAY_LABEL}\",\"start\":2,\"duration\":5,\"font_size\":120,\"x\":\"(w-text_w)/2\",\"y\":\"(h-text_h)/2\"}]"
 
 
-### Step 6: Concat lazytyping (if exists)
+# =========================================
+# 7. CONCAT
+# =========================================
 
 if [[ -f "lazytyping.mp4" ]]; then
-    echo "🎬 Concatenating lazytyping video..."
+    echo "🎬 Concatenating lazytyping..."
 
-    python3 concat-videos.py final-gym.mp4 lazytyping.mp4
+    python3 concat-videos.py final-lazy.mp4 lazytyping.mp4
 
-    # giả sử script output là output.mp4
     mv output.mp4 final-with-lazy.mp4
-
     FINAL_VIDEO="final-with-lazy.mp4"
 else
-    echo "⚠️ No lazytyping video found"
-    FINAL_VIDEO="final-gym.mp4"
+    FINAL_VIDEO="final-lazy.mp4"
 fi
 
 cd ..
 
 
-### Step 7: Upload to YouTube
+# =========================================
+# 8. UPLOAD YOUTUBE
+# =========================================
 
 # Upload $FINAL_VIDEO
 # Title: $TITLE_VIDEO
 # Schedule: $NEXT_PUB_UTC
-# Privacy: private
-
-# Capture VIDEO_ID
+# Playlist: LazyTyping
 
 
-### Step 8: Add to Playlist
-
-# Add VIDEO_ID to playlist: Becoming a Better Me
-
-
-### Step 9: Notify & Cleanup
+# =========================================
+# 9. NOTIFY
+# =========================================
 
 cd telegram-skills
 python send-message.py --group-id=${TARGET_GROUP_ID} --message="Task Complete. ${MARKER_TEXT}"
 cd ..
-
