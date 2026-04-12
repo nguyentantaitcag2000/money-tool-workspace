@@ -19,19 +19,8 @@ MARKER_TEXT="#SUCCESS_MARKER_LAZYTYPING_V1#"
 * `NEXT_PUB_UTC` = (`BASE_DATE` + 1 day) at 09:00 (Asia/Ho_Chi_Minh) -> Convert to ISO UTC.
 
 
-
 # =========================================
-# 2. CLEANUP
-# =========================================
-
-rm -rf telegram-skills/videos && mkdir -p telegram-skills/videos
-rm -f edit-video/final-lazy.mp4
-rm -f edit-video/final-with-lazy.mp4
-rm -f edit-video/lazytyping.mp4
-
-
-# =========================================
-# 3. DOWNLOAD
+# 2. DOWNLOAD
 # =========================================
 
 cd telegram-skills
@@ -40,7 +29,7 @@ cd ..
 
 
 # =========================================
-# 4. SPLIT VIDEO
+# 3. SPLIT VIDEO
 # =========================================
 
 rm -rf edit-video/config-edit-video-with-scene/folder_videos
@@ -68,9 +57,21 @@ if [[ $SOURCE_COUNT -ne $DEST_COUNT || $SOURCE_COUNT -eq 0 ]]; then
 fi
 
 
-### Step 5: Dynamic Labeling
+### Step 4: Dynamic Labeling
 
-UNIQUE_DATES=$(ls telegram-skills/videos | grep -v lazytyping | sed -E 's/.*([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/' | sort | uniq)
+
+# AI guideline:
+# Treat different filename styles as the same date if they point to the same calendar day.
+# Example:
+# - dji_mimo_20260409_064650_0_1775692789643_timelapse.mp4
+# - 2026-04-09 06-37-25-lazytyping.mp4
+# => both are 2026-04-09
+#
+# Robust extraction:
+# - Supports YYYY-MM-DD (e.g. 2026-04-09)
+# - Supports YYYYMMDD   (e.g. 20260409)
+# - Normalizes everything to YYYY-MM-DD before counting unique days
+UNIQUE_DATES="$(# AI will extract unique dates from filenames here)"
 DATE_COUNT=$(echo "$UNIQUE_DATES" | wc -l)
 
 NEXT_START=$((MAX_DAY + 1))
@@ -85,7 +86,7 @@ TITLE_VIDEO="${DAY_LABEL} - ${SUFFIX}"
 
 
 # =========================================
-# 6. EDIT VIDEO (MAIN)
+# 5. EDIT VIDEO (MAIN)
 # =========================================
 
 cd edit-video
@@ -100,7 +101,7 @@ config-edit-video-with-scene/folder_audios \
 
 
 # =========================================
-# 7. CONCAT
+# 6. CONCAT
 # =========================================
 
 if [[ -f "lazytyping.mp4" ]]; then
@@ -118,7 +119,7 @@ cd ..
 
 
 # =========================================
-# 8. UPLOAD YOUTUBE
+# 7. UPLOAD YOUTUBE
 # =========================================
 
 # Upload $FINAL_VIDEO
@@ -128,7 +129,7 @@ cd ..
 
 
 # =========================================
-# 9. NOTIFY
+# 8. NOTIFY
 # =========================================
 
 cd telegram-skills

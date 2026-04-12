@@ -17,58 +17,57 @@ MARKER_TEXT="#SUCCESS_MARKER_GYM_V2#"
 
 3. **Calculate Schedule**:
 * `BASE_DATE` = `publishAt` date of the latest video.
-* `NEXT_PUB_UTC` = (`BASE_DATE` + 1 day) at 09:00 (Asia/Ho_Chi_Minh) -> Convert to ISO UTC.
+* `NEXT_PUB_UTC` = (`BASE_DATE` + 1 day) at 07:00 (Asia/Ho_Chi_Minh) -> Convert to ISO UTC.
 
 
 
 # 2. EXECUTION STEPS
 
-### Step 1: Cleanup & Prep
-
-rm -rf telegram-skills/videos && mkdir -p telegram-skills/videos
-rm -f edit-video/final-gym.mp4
-rm -f edit-video/final-with-lazy.mp4
-rm -f edit-video/lazytyping.mp4
-
-
-### Step 2: Download
+### Step 1: Download
 
 cd telegram-skills
 python download-files.py --group-id=${TARGET_GROUP_ID} --marker-text=${MARKER_TEXT}
 cd ..
 
 
-### Step 3: Split lazytyping & normal videos
+### Step 2: Split lazytyping & normal videos
 
-LAZY_VIDEO=$(ls telegram-skills/videos | grep -i "lazytyping" | head -n 1)
+Goal:
+- Separate "lazytyping" video from normal videos
 
-rm -rf edit-video/config-edit-video-with-scene/folder_videos
-mkdir -p edit-video/config-edit-video-with-scene/folder_videos
+Strict Rules:
+- A file is considered "lazytyping" ONLY IF its filename contains the exact keyword: "lazytyping"
+- DO NOT detect lazytyping based on timestamp, pattern, or any other assumption
+- DO NOT modify the matching rule
 
-SOURCE_COUNT=0
+Constraints:
+- If NO file contains "lazytyping" → this is valid (no lazytyping today)
+- If MORE THAN ONE file contains "lazytyping" → STOP with error
+- All other files are considered normal videos
 
-for file in telegram-skills/videos/*; do
-    filename=$(basename "$file")
+Actions:
+1. Create folder: edit-video/config-edit-video-with-scene/folder_videos
+2. Loop through all files in telegram-skills/videos:
+   - If filename contains "lazytyping":
+       → copy to: edit-video/lazytyping.mp4
+   - Else:
+       → copy to: folder_videos
+3. Count:
+   - SOURCE_COUNT = number of normal videos
+   - DEST_COUNT = number of files in folder_videos
+   - LAZY_COUNT = number of lazytyping files
 
-    if [[ "$filename" == *lazytyping* ]]; then
-        echo "👉 Found lazytyping video: $filename"
-        cp "$file" edit-video/lazytyping.mp4
-    else
-        cp "$file" edit-video/config-edit-video-with-scene/folder_videos/
-        ((SOURCE_COUNT++))
-    fi
-done
+Validation:
+- If SOURCE_COUNT != DEST_COUNT OR SOURCE_COUNT == 0 → ERROR
+- If LAZY_COUNT > 1 → ERROR
+- If LAZY_COUNT == 0 → continue normally (no lazytyping)
 
-DEST_COUNT=$(ls edit-video/config-edit-video-with-scene/folder_videos | wc -l)
-
-# STRICT CHECK
-if [[ $SOURCE_COUNT -ne $DEST_COUNT || $SOURCE_COUNT -eq 0 ]]; then
-    echo "❌ ERROR: Video count mismatch or no valid videos"
-    exit 1
-fi
+Output:
+- Normal videos → folder_videos
+- Lazytyping (if exists) → edit-video/lazytyping.mp4
 
 
-### Step 4: Dynamic Labeling
+### Step 3: Dynamic Labeling
 
 UNIQUE_DATES=$(ls telegram-skills/videos | grep -v lazytyping | sed -E 's/.*([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/' | sort | uniq)
 DATE_COUNT=$(echo "$UNIQUE_DATES" | wc -l)
@@ -84,7 +83,7 @@ fi
 TITLE_VIDEO="${DAY_LABEL} - ${SUFFIX}"
 
 
-### Step 5: Process Video (MAIN VIDEO)
+### Step 4: Process Video (MAIN VIDEO)
 
 cd edit-video
 
@@ -97,7 +96,7 @@ config-edit-video-with-scene/folder_audios \
 --texts "[{\"text\": \"${DAY_LABEL}\",\"start\":2,\"duration\":5,\"font_size\":120,\"x\":\"(w-text_w)/2\",\"y\":\"(h-text_h)/2\"}]"
 
 
-### Step 6: Concat lazytyping (if exists)
+### Step 5: Concat lazytyping (if exists)
 
 if [[ -f "lazytyping.mp4" ]]; then
     echo "🎬 Concatenating lazytyping video..."
@@ -116,7 +115,7 @@ fi
 cd ..
 
 
-### Step 7: Upload to YouTube
+### Step 6: Upload to YouTube
 
 # Upload $FINAL_VIDEO
 # Title: $TITLE_VIDEO
@@ -126,12 +125,12 @@ cd ..
 # Capture VIDEO_ID
 
 
-### Step 8: Add to Playlist
+### Step 7: Add to Playlist
 
 # Add VIDEO_ID to playlist: Becoming a Better Me
 
 
-### Step 9: Notify & Cleanup
+### Step 8: Notify & Cleanup
 
 cd telegram-skills
 python send-message.py --group-id=${TARGET_GROUP_ID} --message="Task Complete. ${MARKER_TEXT}"
