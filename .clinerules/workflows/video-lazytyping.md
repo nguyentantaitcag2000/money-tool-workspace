@@ -125,7 +125,10 @@ cd ..
 # Upload $FINAL_VIDEO
 # Title: $TITLE_VIDEO
 # Schedule: $NEXT_PUB_UTC
-# Playlist: LazyTyping
+
+### Step 8: Add to Playlist
+
+# Add VIDEO_ID to playlist: My Journey to Master 10-Finger Typing - LazyTyping
 
 
 # =========================================
