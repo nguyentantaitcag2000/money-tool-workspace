@@ -7,7 +7,7 @@ MARKER_TEXT="#SUCCESS_MARKER_LAZYTYPING_V1#"
 
 # Critical: Must be completed BEFORE any script execution.
 
-1. **Fetch YouTube Data**: Get the latest uploaded video from the playlist **"My Journey to Master 10-Finger Typing - LazyTyping"** on the "Talilow" channel.
+1. **Fetch YouTube Data**: Get the latest/most recent video from a YouTube playlist **"My Journey to Master 10-Finger Typing - LazyTyping"** on the "Talilow" channel.
 2. **Extract Info**:
 * `LATEST_TITLE` = Full title of the latest video.
 * `MAX_DAY` = The highest number after the word "Day" in `LATEST_TITLE`.
@@ -16,8 +16,10 @@ MARKER_TEXT="#SUCCESS_MARKER_LAZYTYPING_V1#"
 
 3. **Calculate Schedule**:
 * `BASE_DATE` = `publishAt` date of the latest video.
-* `NEXT_PUB_UTC` = (`BASE_DATE` + 1 day) at 09:00 (Asia/Ho_Chi_Minh) -> Convert to ISO UTC.
-
+* Start checking from `BASE_DATE + 1 day` at 09:00 (Asia/Ho_Chi_Minh)
+* ✅ **IMPORTANT FIX**: Check if this time slot already has a SCHEDULED video in the playlist. 
+* If slot is already taken: increment +1 day and check again, keep incrementing until find first EMPTY available slot at 09:00
+* Use that empty slot as `NEXT_PUB_UTC` (convert to ISO UTC)
 
 # =========================================
 # 2. DOWNLOAD
