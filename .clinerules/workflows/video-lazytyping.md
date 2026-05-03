@@ -16,10 +16,14 @@ MARKER_TEXT="#SUCCESS_MARKER_LAZYTYPING_V1#"
 
 3. **Calculate Schedule**:
 * `BASE_DATE` = `publishAt` date of the latest video.
-* Start checking from `BASE_DATE + 1 day` at 09:00 (Asia/Ho_Chi_Minh)
-* ✅ **IMPORTANT FIX**: Check if this time slot already has a SCHEDULED video in the playlist. 
-* If slot is already taken: increment +1 day and check again, keep incrementing until find first EMPTY available slot at 09:00
-* Use that empty slot as `NEXT_PUB_UTC` (convert to ISO UTC)
+* ✅ **UPDATED Logic (No Time Constraints)**:
+  * Start checking from `BASE_DATE + 1 day` (ignore time of day, only check date)
+  * If there is **NO VIDEO** (neither published nor scheduled) for this date in the playlist → **PUBLISH IMMEDIATELY NOW** (do not schedule)
+  * If there **IS ALREADY** a video (published or scheduled) for this date → increment +1 day and check again
+  * Keep incrementing +1 day until find first **EMPTY DATE** with no video in the playlist
+  * If empty date is **TODAY** → publish immediately now
+  * If empty date is **FUTURE DATE** → schedule for that date at 09:00 (Asia/Ho_Chi_Minh)
+* Convert final publish time to `NEXT_PUB_UTC` (ISO UTC format)
 
 # =========================================
 # 2. DOWNLOAD
@@ -60,9 +64,7 @@ fi
 
 
 ### Step 4: Dynamic Labeling
-
-
-# AI guideline:
+# Require READ skill **file_date_recognition_and_comparison**
 # Treat different filename styles as the same date if they point to the same calendar day.
 # Example:
 # - dji_mimo_20260409_064650_0_1775692789643_timelapse.mp4

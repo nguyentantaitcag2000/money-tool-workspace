@@ -4,3 +4,4 @@ telegram-skills
 telegram-mcp
 edit-video
 .DS_Store
+.env

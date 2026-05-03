@@ -17,7 +17,14 @@ MARKER_TEXT="#SUCCESS_MARKER_GYM_V2#"
 
 3. **Calculate Schedule**:
 * `BASE_DATE` = `publishAt` date of the latest video.
-* `NEXT_PUB_UTC` = (`BASE_DATE` + 1 day) at 07:00 (Asia/Ho_Chi_Minh) -> Convert to ISO UTC.
+* ✅ **UPDATED Logic (No Time Constraints)**:
+  * Start checking from `BASE_DATE + 1 day` (ignore time of day, only check date)
+  * If there is **NO VIDEO** (neither published nor scheduled) for this date in the playlist → **PUBLISH IMMEDIATELY NOW** (do not schedule)
+  * If there **IS ALREADY** a video (published or scheduled) for this date → increment +1 day and check again
+  * Keep incrementing +1 day until find first **EMPTY DATE** with no video in the playlist
+  * If empty date is **TODAY** → publish immediately now
+  * If empty date is **FUTURE DATE** → schedule for that date at 07:00 (Asia/Ho_Chi_Minh)
+* Convert final publish time to `NEXT_PUB_UTC` (ISO UTC format)
 
 
 
@@ -68,7 +75,7 @@ Output:
 
 
 ### Step 3: Dynamic Labeling
-
+# Require READ skill **file_date_recognition_and_comparison**
 UNIQUE_DATES=$(ls telegram-skills/videos | grep -v lazytyping | sed -E 's/.*([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/' | sort | uniq)
 DATE_COUNT=$(echo "$UNIQUE_DATES" | wc -l)
 
