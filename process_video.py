@@ -159,14 +159,20 @@ def compute_next_publish(items, publish_hour):
 # =========================
 
 def upload_video(youtube, file_path, title, publish_time_utc):
+    status = {}
+
+    if publish_time_utc:
+        status["privacyStatus"] = "private"
+        status["publishAt"] = publish_time_utc
+    else:
+        status["privacyStatus"] = "public"
+
     body = {
         "snippet": {
             "title": title,
             "categoryId": "22"
         },
-        "status": {
-            "privacyStatus": "private"
-        }
+        "status": status
     }
 
     if publish_time_utc:
