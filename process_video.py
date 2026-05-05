@@ -14,7 +14,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BASE_DIR = "/Users/tainguyen/Programing/Python/Money-Tool"
-API_KEY = os.getenv("YOUTUBE_API_KEY")
 secret_path = os.getenv("CLIENT_SECRET_PATH", "client_secret.json")
 CONFIG = {
     "gym": {
@@ -66,25 +65,21 @@ def get_youtube_service():
 # YOUTUBE FETCH
 # =========================
 
-def get_playlist_videos(playlist_id):
-    url = "https://www.googleapis.com/youtube/v3/playlistItems"
+def get_playlist_videos(youtube, playlist_id):
+    items = []
+    request = youtube.playlistItems().list(
+        part="snippet",
+        playlistId=playlist_id,
+        maxResults=50
+    )
 
-    params = {
-        "part": "snippet",
-        "playlistId": playlist_id,
-        "maxResults": 50,
-        "key": API_KEY
-    }
+    while request:
+        response = request.execute()
+        items.extend(response.get("items", []))
+        request = youtube.playlistItems().list_next(request, response)
 
-    res = requests.get(url, params=params,timeout=30).json()
+    return items
 
-    # DEBUG LOG
-    if "items" not in res:
-        print("❌ YouTube API Error:")
-        print(res)
-        sys.exit(1)
-
-    return res["items"]
 def get_latest_video_info(items):
     items.sort(key=lambda x: x["snippet"]["publishedAt"], reverse=True)
     latest = items[0]["snippet"]
@@ -255,7 +250,8 @@ def main():
     run(f"bash {BASE_DIR}/strong_cleanup.sh")
 
     # 2. YOUTUBE DATA
-    items = get_playlist_videos(cfg["PLAYLIST_ID"])
+    items = get_playlist_videos(youtube, cfg["PLAYLIST_ID"])
+
     latest_title = get_latest_video_info(items)
 
     print(f"🎬 Latest: {latest_title}")
