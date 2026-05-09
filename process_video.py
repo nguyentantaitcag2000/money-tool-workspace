@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BASE_DIR = "/Users/tainguyen/Programing/Python/Money-Tool"
+CONFIG_DIR = os.path.join(BASE_DIR, "config")
 secret_path = os.getenv("CLIENT_SECRET_PATH", "client_secret.json")
 CONFIG = {
     "gym": {
@@ -49,6 +50,23 @@ def run(cmd, cwd=None):
     if result.returncode != 0:
         print("❌ ERROR")
         sys.exit(1)
+
+
+def load_playlist_config(playlist_type):
+    playlist_dir = os.path.join(CONFIG_DIR, playlist_type)
+    description_path = os.path.join(playlist_dir, "description.txt")
+
+    playlist_config = {
+        "description": None,
+    }
+
+    if os.path.exists(description_path):
+        with open(description_path, "r", encoding="utf-8") as file_handle:
+            description = file_handle.read().strip()
+            if description:
+                playlist_config["description"] = description
+
+    return playlist_config
 
 # =========================
 # YOUTUBE AUTH
@@ -158,7 +176,7 @@ def compute_next_publish(items, publish_hour):
 # UPLOAD
 # =========================
 
-def upload_video(youtube, file_path, title, publish_time_utc):
+def upload_video(youtube, file_path, title, publish_time_utc, description=None):
     status = {}
 
     if publish_time_utc:
@@ -174,6 +192,9 @@ def upload_video(youtube, file_path, title, publish_time_utc):
         },
         "status": status
     }
+
+    if description:
+        body["snippet"]["description"] = description
 
     if publish_time_utc:
         body["status"]["publishAt"] = publish_time_utc
@@ -239,6 +260,7 @@ def main():
     args = parser.parse_args()
 
     cfg = CONFIG[args.type]
+    playlist_config = load_playlist_config(args.type)
 
     # 1. Check file secret cục bộ
     if not check_secret_exists(secret_path):
@@ -328,7 +350,8 @@ config-edit-video-with-scene/folder_audios \
         youtube,
         os.path.join(edit_dir, final_video),
         title_video,
-        next_pub
+        next_pub,
+        description=playlist_config["description"]
     )
 
     add_to_playlist(youtube, video_id, cfg["PLAYLIST_ID"])
