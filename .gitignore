@@ -6,3 +6,5 @@ edit-video
 .DS_Store
 .env
 token_cache.json
+data/
+media/

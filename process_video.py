@@ -376,7 +376,15 @@ config-edit-video-with-scene/folder_audios \
 
     add_to_playlist(youtube, video_id, cfg["PLAYLIST_ID"])
 
-    # 9. NOTIFY
+    # 9. UPLOAD TO THREADS
+    playwright_dir = f"{BASE_DIR}/playwright"
+    threads_video = os.path.join(edit_dir, final_video)
+    run(
+        f'npx ts-node src/scenarios/threads-upload.ts --video "{threads_video}" --caption "{title_video}"',
+        cwd=playwright_dir
+    )
+
+    # 10. NOTIFY
     run(
         f'{TELEGRAM_PYTHON} send-message.py --group-id={cfg["GROUP_ID"]} --message="Task Complete. {cfg["MARKER"]}"',
         cwd=f"{BASE_DIR}/telegram-skills"

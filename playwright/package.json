@@ -1,0 +1,23 @@
+{
+  "name": "playwright",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "threads:upload": "ts-node src/scenarios/threads-upload.ts",
+    "kill-browser": "lsof -ti tcp:9333 | xargs kill -9 2>/dev/null && echo 'Chrome killed' || echo 'No Chrome on port 9333'",
+    "logs": "tail -50 data/browser.log 2>/dev/null || echo 'No log file yet'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "playwright": "^1.59.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}
