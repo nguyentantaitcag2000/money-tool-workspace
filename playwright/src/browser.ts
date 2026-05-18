@@ -214,3 +214,62 @@ export async function saveCookies(
   const cookies = await context.cookies();
   fs.writeFileSync(cookiesPath, JSON.stringify(cookies, null, 2));
 }
+
+// ---------------------------------------------------------------------------
+// Large-file injection (CDP-safe, no setInputFiles)
+// ---------------------------------------------------------------------------
+
+/**
+ * Inject a local file (any size) into a hidden <input type="file"> without
+ * using Playwright's setInputFiles().
+ *
+ * Strategy: call the Chrome CDP command DOM.setFileInputFiles directly via a
+ * raw CDP session.  Chrome reads the file from its OWN local filesystem, so
+ * zero file data travels over the CDP websocket → no 50 MB limit, no CSP
+ * interference, works with all React-based sites.
+ *
+ * Prerequisites: the Playwright process and Chrome must share the same
+ * filesystem (both running locally on the same machine), which is always true
+ * when using connectOverCDP() to a local Chrome instance.
+ */
+export async function injectLargeFile(
+  page: Page,
+  inputSelector: string,
+  filePath: string,
+): Promise<void> {
+  const fileName = path.basename(filePath);
+  const fileSize = fs.statSync(filePath).size;
+  console.log(
+    `📎 Injecting ${fileName} (${(fileSize / 1_048_576).toFixed(1)} MB) via CDP...`,
+  );
+
+  // Open a page-level CDP session — works with connectOverCDP()
+  const session = await page.context().newCDPSession(page);
+  try {
+    // Resolve the file input element to a backendNodeId
+    const { result } = await session.send("Runtime.evaluate", {
+      expression: `document.querySelector(${JSON.stringify(inputSelector)})`,
+      returnByValue: false,
+    });
+
+    if (result.subtype === "null" || !result.objectId) {
+      throw new Error(`File input not found: ${inputSelector}`);
+    }
+
+    const { node } = await session.send("DOM.describeNode", {
+      objectId: result.objectId,
+    });
+
+    if (!node.backendNodeId) {
+      throw new Error(`Could not obtain backendNodeId for: ${inputSelector}`);
+    }
+
+    // Chrome reads the file from disk — no data crosses the CDP websocket
+    await session.send("DOM.setFileInputFiles", {
+      files: [filePath],
+      backendNodeId: node.backendNodeId,
+    });
+  } finally {
+    await session.detach();
+  }
+}

@@ -18,6 +18,7 @@ import {
   connectOrLaunch,
   loadCookies,
   saveCookies,
+  injectLargeFile,
 } from "../browser";
 
 // ---------------------------------------------------------------------------
@@ -117,11 +118,11 @@ async function main() {
     console.log("✏️  Opening compose dialog...");
 
     // goto https://www.threads.com/@talilow.x
-    page.goto("https://www.threads.com/@talilow.x", {
+    await page.goto("https://www.threads.com/@talilow.x", {
       waitUntil: "networkidle",
     });
     // click div have aria-label="Empty text field. Type to compose a new post."
-    page
+    await page
       .locator(
         'div[aria-label="Empty text field. Type to compose a new post."]',
       )
@@ -133,28 +134,28 @@ async function main() {
     // -----------------------------------------------------------------------
     // 4. Attach video file
     // -----------------------------------------------------------------------
-    console.log("📎 Attaching video...");
 
     // Threads uses a hidden <input type="file"> triggered by clicking a media icon
-    const mediaButtonSelectors = [
-      '[aria-label="Attach media"]',
-      '[aria-label="Add media"]',
-      'svg[aria-label="Gallery"]',
-      '[data-testid="media-upload-button"]',
-    ];
+    console.log("📎 Preparing media input...");
 
-    for (const sel of mediaButtonSelectors) {
-      const el = page.locator(sel).first();
-      if (await el.isVisible().catch(() => false)) {
-        await el.click();
-        await humanDelay(500, 1000);
-        break;
-      }
-    }
+    // Đợi input file xuất hiện trong DOM
+    const fileInput = page.locator('input[type="file"]').last();
 
-    // Set file on the hidden input
-    const fileInput = page.locator('input[type="file"]').first();
-    await fileInput.setInputFiles(videoPath);
+    await fileInput.waitFor({
+      state: "attached",
+      timeout: 15000,
+    });
+
+    // Force hiện input nếu Threads đang hidden nó
+    await fileInput.evaluate((el: HTMLInputElement) => {
+      el.style.display = "block";
+      el.style.visibility = "visible";
+      el.style.opacity = "1";
+    });
+
+    // Inject trực tiếp file vào input
+    await injectLargeFile(page, 'input[type="file"]', videoPath);
+
     console.log("⏳ Waiting for video to process...");
 
     // Wait until the video preview/thumbnail appears (up to 90 s for large files)

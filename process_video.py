@@ -6,6 +6,7 @@ import sys
 import re
 import requests
 from datetime import datetime, timedelta
+import socket
 
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.oauth2.credentials import Credentials
@@ -43,6 +44,20 @@ SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.force-ssl"
 ]
+
+def enable_ipv4_fallback():
+    old_getaddrinfo = socket.getaddrinfo
+
+    def force_ipv4(*args, **kwargs):
+        return [
+            info
+            for info in old_getaddrinfo(*args, **kwargs)
+            if info[0] == socket.AF_INET
+        ]
+
+    socket.getaddrinfo = force_ipv4
+
+    print("⚠️ IPv6 issue detected -> forcing IPv4")
 
 # =========================
 # UTIL
@@ -262,12 +277,20 @@ def check_secret_exists(path):
 
 def health_check_api(youtube):
     try:
-        # Lệnh này chỉ tốn ~1 đơn vị quota (rất rẻ so với 1600 của upload)
-        youtube.channels().list(part="id", mine=True).execute()
+        youtube.channels().list(
+            part="id",
+            mine=True
+        ).execute(num_retries=3)
+
         print("✅ Health Check: Authentication is valid.")
         return True
+
+    except TimeoutError:
+        print("⚠️ Timeout detected during API call")
+        raise
+
     except Exception as e:
-        print(f"❌ Health Check: Authentication expired or invalid. Error: {e}")
+        print(f"❌ Health Check Failed: {repr(e)}")
         return False
     
 # =========================
@@ -287,12 +310,21 @@ def main():
         sys.exit(1)
 
     # 2. Khởi tạo service
-    youtube = get_youtube_service()
+    try:
+        youtube = get_youtube_service()
 
-    # 3. API Health Check trước khi chạy các tác vụ nặng
-    if not health_check_api(youtube):
-        print("Vui lòng xóa file token cũ và chạy lại để re-auth.")
-        sys.exit(1)
+        if not health_check_api(youtube):
+            sys.exit(1)
+
+    except TimeoutError:
+        print("Retrying with IPv4 fallback...")
+
+        enable_ipv4_fallback()
+
+        youtube = get_youtube_service()
+
+        if not health_check_api(youtube):
+            sys.exit(1)
 
     # 1. CLEANUP
     run(f"bash {BASE_DIR}/strong_cleanup.sh")
