@@ -13,6 +13,7 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 import googleapiclient.http
+from googleapiclient.errors import HttpError
 import json
 from dotenv import load_dotenv
 load_dotenv()
@@ -127,7 +128,13 @@ def get_playlist_videos(youtube, playlist_id):
     )
 
     while request:
-        response = request.execute()
+        try:
+            response = request.execute()
+        except HttpError as e:
+            if e.resp.status == 404:
+                print(f"⚠️ Playlist page not found (stale pageToken), stopping pagination with {len(items)} items.")
+                break
+            raise
         items.extend(response.get("items", []))
         request = youtube.playlistItems().list_next(request, response)
 

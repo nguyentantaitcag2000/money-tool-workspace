@@ -198,19 +198,21 @@ async function main() {
 
     // Find div have role="button" and contains text "Post" and click
     const postButton = page
-      .locator('div[role="button"]', { hasText: "Post" })
+      .locator('div[role="button"]:has-text("Post")')
+      .filter({
+        hasText: /^Post$/,
+      })
       .last();
 
     await postButton.click();
 
-    // Đợi đến khi thấy div có chính xác chữ "Posting..." biến mất (tối đa 30 giây)
-    await page.locator("div", { hasText: "Posting..." }).waitFor({
-      state: "detached",
-      timeout: 30_000,
-    });
-    // Đợi đến khi mất đi chữ "Posting..." (tối đa 5 phút)
-    await page.locator("div", { hasText: "Posting..." }).waitFor({
-      state: "detached",
+    // Wait until Threads finishes posting
+    const postingIndicator = page
+      .getByRole("status")
+      .filter({ hasText: /^Posting\.\.\.$/ });
+
+    await postingIndicator.waitFor({
+      state: "hidden",
       timeout: 300_000,
     });
     // Save refreshed cookies
