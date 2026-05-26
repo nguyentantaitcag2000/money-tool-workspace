@@ -38,6 +38,14 @@ CONFIG = {
         "PUBLISH_HOUR": 9,
         "OUTPUT": "final-lazy.mp4",
         "SKIP": "5"
+    },
+    "guitar": {
+        "GROUP_ID": "-5261026148",
+        "MARKER": "#SUCCESS_MARKER_GUITAR_V1#",
+        "PLAYLIST_ID": "PL6vRTrd-KXO7L6pqBPGA5fDtOQ_MDnOBI",
+        "PUBLISH_HOUR": 8,
+        "OUTPUT": "final-guitar.mp4",
+        "SKIP": "5"
     }
 }
 
@@ -78,13 +86,22 @@ def load_playlist_config(playlist_type):
 
     playlist_config = {
         "description": None,
+        "suffix": None,
     }
+
+    title_path = os.path.join(playlist_dir, "title.txt")
 
     if os.path.exists(description_path):
         with open(description_path, "r", encoding="utf-8") as file_handle:
             description = file_handle.read().strip()
             if description:
                 playlist_config["description"] = description
+
+    if os.path.exists(title_path):
+        with open(title_path, "r", encoding="utf-8") as file_handle:
+            suffix = file_handle.read().strip()
+            if suffix:
+                playlist_config["suffix"] = suffix
 
     return playlist_config
 
@@ -174,8 +191,8 @@ def extract_dates(files):
 
     return dates
 
-def generate_title(latest_title, files):
-    max_day, suffix = extract_day_and_suffix(latest_title)
+def generate_title(latest_title, files, suffix):
+    max_day, _ = extract_day_and_suffix(latest_title)
     dates = extract_dates(files)
 
     next_day = max_day + 1
@@ -306,7 +323,7 @@ def health_check_api(youtube):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--type", required=True, choices=["gym", "lazytyping"])
+    parser.add_argument("--type", required=True, choices=["gym", "lazytyping", "guitar"])
     args = parser.parse_args()
 
     cfg = CONFIG[args.type]
@@ -355,15 +372,15 @@ def main():
 
     os.makedirs(f"{edit_dir}/config-edit-video-with-scene/folder_videos", exist_ok=True)
 
-    lazy_count = 0
+    keep_count = 0
     normal_files = []
 
     for f in os.listdir(video_dir):
         src = os.path.join(video_dir, f)
 
-        if "lazytyping" in f:
-            run(f"cp '{src}' {edit_dir}/lazytyping.mp4")
-            lazy_count += 1
+        if "keep" in f:
+            run(f"cp '{src}' {edit_dir}/keep.mp4")
+            keep_count += 1
         else:
             run(f"cp '{src}' {edit_dir}/config-edit-video-with-scene/folder_videos/")
             normal_files.append(f)
@@ -372,12 +389,12 @@ def main():
         print("❌ No videos")
         sys.exit(1)
 
-    if lazy_count > 1:
-        print("❌ Multiple lazytyping")
+    if keep_count > 1:
+        print("❌ Multiple keep videos")
         sys.exit(1)
 
     # 4. TITLE
-    day_label, title_video = generate_title(latest_title, normal_files)
+    day_label, title_video = generate_title(latest_title, normal_files, playlist_config["suffix"])
 
     # 5. SCHEDULE
     next_pub = compute_next_publish(items, cfg["PUBLISH_HOUR"])
@@ -399,10 +416,10 @@ config-edit-video-with-scene/folder_audios \
     # 7. CONCAT
     final_video = cfg["OUTPUT"]
 
-    if os.path.exists(f"{edit_dir}/lazytyping.mp4"):
-        run(f"python3 concat-videos.py {cfg['OUTPUT']} lazytyping.mp4", cwd=edit_dir)
-        run("mv output.mp4 final-with-lazy.mp4", cwd=edit_dir)
-        final_video = "final-with-lazy.mp4"
+    if os.path.exists(f"{edit_dir}/keep.mp4"):
+        run(f"python3 concat-videos.py {cfg['OUTPUT']} keep.mp4", cwd=edit_dir)
+        run("mv output.mp4 final-with-keep.mp4", cwd=edit_dir)
+        final_video = "final-with-keep.mp4"
 
     # 8. UPLOAD
     video_id = upload_video(
