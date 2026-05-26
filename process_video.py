@@ -158,6 +158,9 @@ def get_playlist_videos(youtube, playlist_id):
     return items
 
 def get_latest_video_info(items):
+    if not items:
+        return None
+
     items.sort(key=lambda x: x["snippet"]["publishedAt"], reverse=True)
     latest = items[0]["snippet"]
 
@@ -192,7 +195,7 @@ def extract_dates(files):
     return dates
 
 def generate_title(latest_title, files, suffix):
-    max_day, _ = extract_day_and_suffix(latest_title)
+    max_day, _ = extract_day_and_suffix(latest_title) if latest_title else (0, None)
     dates = extract_dates(files)
 
     next_day = max_day + 1
@@ -209,6 +212,9 @@ def generate_title(latest_title, files, suffix):
 # =========================
 
 def compute_next_publish(items, publish_hour):
+    if not items:
+        return None
+
     used_dates = set()
 
     for item in items:
