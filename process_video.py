@@ -162,9 +162,13 @@ def get_latest_video_info(items):
         return None
 
     items.sort(key=lambda x: x["snippet"]["publishedAt"], reverse=True)
-    latest = items[0]["snippet"]
 
-    return latest["title"]
+    for item in items:
+        title = item["snippet"]["title"]
+        if re.search(r'Day\s+(\d+)', title):
+            return title
+
+    return None
 
 # =========================
 # TITLE

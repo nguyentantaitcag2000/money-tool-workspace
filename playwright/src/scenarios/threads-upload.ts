@@ -79,7 +79,14 @@ async function main() {
     // 1. Go to Threads
     // -----------------------------------------------------------------------
     console.log("🌐 Navigating to Threads...");
-    await page.goto("https://www.threads.com", { waitUntil: "networkidle" });
+    /*Sử dụng đoạn wait networkidle không ổn định với các trang spa, vì nó hay lỗi timeout*/
+    // await page.goto("https://www.threads.com", { waitUntil: "networkidle" });
+    await page.goto("https://www.threads.com", {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+    await page.waitForSelector("body");
+
     await humanDelay(1500, 2500);
 
     // -----------------------------------------------------------------------
