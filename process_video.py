@@ -222,8 +222,14 @@ def compute_next_publish(items, publish_hour):
     used_dates = set()
 
     for item in items:
+        title = item["snippet"]["title"]
+        if not re.search(r'Day\s+(\d+)', title):
+            continue
         dt = datetime.fromisoformat(item["snippet"]["publishedAt"].replace("Z", "+00:00"))
         used_dates.add(dt.date())
+
+    if not used_dates:
+        return None
 
     latest = max(used_dates)
     current = latest + timedelta(days=1)
