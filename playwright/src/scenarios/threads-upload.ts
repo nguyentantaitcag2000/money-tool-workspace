@@ -212,6 +212,11 @@ async function main() {
       .last();
 
     await postButton.click();
+    // wait until see "Posting..." appear
+    await page
+      .getByRole("status")
+      .filter({ hasText: /^Posting\.\.\.$/ })
+      .waitFor({ timeout: 15000 });
 
     // Wait until Threads finishes posting
     const postingIndicator = page
