@@ -424,6 +424,8 @@ config-edit-video-with-scene/folder_audios \
 --output {cfg['OUTPUT']} \
 --skip {cfg['SKIP']} \
 --trim-end 1 \
+--type {args.type} \
+--config-dir {CONFIG_DIR} \
 --texts '[{{"text":"{day_label}","start":2,"duration":5,"font_size":120,"x":"(w-text_w)/2","y":"(h-text_h)/2"}}]'
 """,
         cwd=edit_dir

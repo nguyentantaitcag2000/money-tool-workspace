@@ -1,0 +1,6 @@
+# Bài hát loại trừ khỏi random audio (áp dụng mọi loại video)
+# Một dòng = một bài. Có thể ghi tên file đầy đủ hoặc không có đuôi.
+# Ví dụ:
+# thay-doi.webm
+# thay-doi
+thay-doi
