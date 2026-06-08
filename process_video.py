@@ -4,6 +4,8 @@ import subprocess
 import os
 import sys
 import re
+import time
+import ssl
 import requests
 from datetime import datetime, timedelta
 import socket
@@ -252,7 +254,15 @@ def compute_next_publish(items, publish_hour):
 # UPLOAD
 # =========================
 
-def upload_video(youtube, file_path, title, publish_time_utc, description=None):
+TRANSIENT_UPLOAD_ERRORS = (
+    ConnectionResetError,
+    BrokenPipeError,
+    TimeoutError,
+    ssl.SSLError,
+    socket.timeout,
+)
+
+def _build_upload_request(youtube, file_path, title, publish_time_utc, description, media=None):
     status = {}
 
     if publish_time_utc:
@@ -275,21 +285,75 @@ def upload_video(youtube, file_path, title, publish_time_utc, description=None):
     if publish_time_utc:
         body["status"]["publishAt"] = publish_time_utc
 
-    media = googleapiclient.http.MediaFileUpload(file_path, resumable=True)
+    if media is None:
+        media = googleapiclient.http.MediaFileUpload(file_path, resumable=True)
 
-    request = youtube.videos().insert(
+    return youtube.videos().insert(
         part="snippet,status",
         body=body,
         media_body=media
+    ), media
+
+
+def upload_video(youtube, file_path, title, publish_time_utc, description=None, max_retries=5):
+    request, media = _build_upload_request(
+        youtube, file_path, title, publish_time_utc, description
     )
 
     print("📤 Uploading...")
 
     response = None
+    retries = 0
+
     while response is None:
-        status, response = request.next_chunk()
-        if status:
-            print(f"{int(status.progress() * 100)}%")
+        try:
+            status, response = request.next_chunk()
+            if status:
+                print(f"{int(status.progress() * 100)}%")
+            retries = 0
+        except TRANSIENT_UPLOAD_ERRORS as exc:
+            retries += 1
+            if retries > max_retries:
+                raise
+            wait = min(2 ** retries, 30)
+            print(
+                f"⚠️ Mất kết nối ({type(exc).__name__}), "
+                f"thử lại sau {wait}s ({retries}/{max_retries})..."
+            )
+            time.sleep(wait)
+        except HttpError as exc:
+            if exc.resp.status in (401, 403) and retries < max_retries:
+                retries += 1
+                wait = min(2 ** retries, 30)
+                print(
+                    f"⚠️ Token hết hạn hoặc không hợp lệ, "
+                    f"làm mới và thử lại sau {wait}s ({retries}/{max_retries})..."
+                )
+                time.sleep(wait)
+                youtube = get_youtube_service()
+                request, media = _build_upload_request(
+                    youtube, file_path, title, publish_time_utc, description, media=media
+                )
+            elif exc.resp.status >= 500 and retries < max_retries:
+                retries += 1
+                wait = min(2 ** retries, 30)
+                print(
+                    f"⚠️ Lỗi server YouTube ({exc.resp.status}), "
+                    f"thử lại sau {wait}s ({retries}/{max_retries})..."
+                )
+                time.sleep(wait)
+            else:
+                raise
+        except OSError as exc:
+            if exc.errno not in (54, 32, 104, 110) or retries >= max_retries:
+                raise
+            retries += 1
+            wait = min(2 ** retries, 30)
+            print(
+                f"⚠️ Lỗi mạng ({exc}), "
+                f"thử lại sau {wait}s ({retries}/{max_retries})..."
+            )
+            time.sleep(wait)
 
     return response["id"]
 
@@ -442,11 +506,22 @@ def main():
 
     batch_files = load_telegram_batch_files(cfg["GROUP_ID"], video_dir)
     if not batch_files:
-        batch_files = [
-            os.path.join(video_dir, filename)
-            for filename in os.listdir(video_dir)
-            if os.path.isfile(os.path.join(video_dir, filename))
-        ]
+        print(
+            "❌ Không có video batch từ Telegram (manifest rỗng hoặc thiếu file).\n"
+            "   Chạy lại download hoặc dùng --force-download nếu cần."
+        )
+        sys.exit(1)
+
+    local_video_count = sum(
+        1
+        for filename in os.listdir(video_dir)
+        if os.path.isfile(os.path.join(video_dir, filename))
+    )
+    if local_video_count > len(batch_files):
+        print(
+            f"ℹ️  Thư mục local có {local_video_count} file, "
+            f"batch Telegram hiện tại {len(batch_files)} — chỉ dùng {len(batch_files)} file trong manifest."
+        )
 
     keep_count = 0
     normal_files = []
@@ -507,6 +582,12 @@ config-edit-video-with-scene/folder_audios \
             print("🛑 Đã huỷ — bỏ qua upload YouTube, Threads và thông báo Telegram.")
             sys.exit(0)
         print("✅ Đã xác nhận — tiếp tục upload.")
+
+    # Làm mới kết nối sau khi preview (máy sleep / idle lâu có thể làm đứt SSL)
+    print("🔄 Làm mới kết nối YouTube trước khi upload...")
+    youtube = get_youtube_service()
+    if not health_check_api(youtube):
+        sys.exit(1)
 
     # 8. UPLOAD
     video_id = upload_video(
