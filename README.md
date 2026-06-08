@@ -1,8 +1,35 @@
 # Money-Tool
 
-## Loại trừ bài hát khỏi random audio
+## Cài đặt
 
-Khi dựng video, script `edit-video/edit-video-gym.py` chọn ngẫu nhiên một bài từ `edit-video/config-edit-video-with-scene/folder_audios/`. Nếu có bài không muốn dùng nữa, thêm tên vào file config bên dưới — không cần xóa file `.webm` / `.wav` hay file cut-points `.txt` khỏi thư mục nhạc.
+### Python
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+| Nhóm | Dùng cho |
+|------|----------|
+| `google-*`, `requests`, `python-dotenv` | `process_video.py`, upload YouTube |
+| `Telethon`, `rich` | `telegram-skills/` (tải video, gửi tin) |
+| `opencv-python`, `Pillow` | `--preview` (xem trước video) |
+| `numpy`, `pydub`, `tqdm`, `pytest` | Script phụ trong `edit-video/` |
+
+### Công cụ hệ thống (không cài qua pip)
+
+- **ffmpeg** / **ffplay** — dựng video (`edit-video-gym.py`) và phát audio preview  
+  `brew install ffmpeg`
+- **Node.js** + **npm** — upload Threads (`playwright/`)
+
+## Chọn audio và đồng bộ video
+
+Khi dựng video, script `edit-video/edit-video-gym.py` **phân tích thời lượng video** (sau skip/trim), so sánh với cut-points của từng bài trong `edit-video/config-edit-video-with-scene/folder_audios/`, rồi chọn bài **khớp nhất** (mặc định `--smart-audio`). Dùng `--no-smart-audio` nếu muốn chọn ngẫu nhiên như trước.
+
+Khi video hơi ngắn so với scene (ví dụ 9s cần 10s), script sẽ **kéo dài nhẹ** thay vì ghép clip 1 giây bị tua nhanh. Ngưỡng mặc định: tối đa **2 giây** và **15%** thời lượng video (`--max-stretch-sec`, `--max-stretch-ratio`). Nếu thiếu quá nhiều (ví dụ 9s cần 14s), ghép video tiếp theo bình thường và **tái sử dụng** phần còn dư qua nhiều scene.
+
+## Loại trừ bài hát khỏi danh sách audio
 
 ### File config
 
@@ -49,7 +76,34 @@ Pipeline tự đọc config qua `--type` và `--config-dir`:
 caffeinate python process_video.py --type gym
 ```
 
+Thêm `--preview` để xem video sau khi dựng xong; cửa sổ có nút **Next** (tiếp tục upload) và **Cancel** (dừng, không upload):
+
+```bash
+caffeinate python process_video.py --type gym --preview
+```
+
 Các loại khác: `--type guitar`, `--type lazytyping`.
+
+### Cache download Telegram
+
+Mặc định pipeline **không** xóa video đã tải trong `telegram-skills/videos/`. Trước khi tải, script so khớp batch video trên Telegram với manifest local (khóa file Telegram + SHA256); file đã có và còn nguyên vẹn sẽ được bỏ qua. Chỉ dọn artifact tạm trong `edit-video/` (không đụng cache video).
+
+| Flag | Tác dụng |
+|------|----------|
+| `--force-download` | Bỏ qua cache, tải lại toàn bộ batch video từ Telegram (dùng khi test hoặc nghi cache lỗi) |
+| `--force-cleanup` | Chạy `strong_cleanup.sh` — xóa cache video Telegram và artifact edit-video trước khi chạy (reset hoàn toàn như hành vi cũ) |
+
+Ví dụ:
+
+```bash
+# Tải lại dù file local đã có
+caffeinate python process_video.py --type gym --force-download
+
+# Reset hoàn toàn cache video + edit artifacts
+caffeinate python process_video.py --type gym --force-cleanup
+```
+
+Reset thủ công cache (không chạy pipeline): `bash strong_cleanup.sh`
 
 ### Kiểm tra nhanh (không render video)
 
@@ -63,4 +117,4 @@ python3 edit-video-gym.py \
   --dry-run
 ```
 
-Khi có bài bị loại, log sẽ hiện dòng `🚫 Loại trừ N bài hát: ...`.
+Khi có bài bị loại, log sẽ hiện dòng `🚫 Loại trừ N bài hát: ...`. Khi smart audio bật, log còn hiện bài được chọn và top 3 điểm khớp.

@@ -1,0 +1,25 @@
+# Money-Tool — cài đặt: pip install -r requirements.txt
+# Khuyến nghị dùng virtualenv: python3 -m venv venv && source venv/bin/activate
+
+# --- process_video.py / list_playlists.py (YouTube API) ---
+google-api-python-client>=2.100.0
+google-auth-oauthlib>=1.2.0
+google-auth>=2.20.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# --- telegram-skills (download, gửi tin nhắn) ---
+Telethon>=1.34.0
+rich>=13.0.0
+
+# --- video_preview.py (--preview) ---
+opencv-python>=4.8.0
+Pillow>=10.0.0
+
+# --- edit-video (script phụ: reverse, logo GUI, edit-audio, unit test) ---
+numpy>=1.21.0
+pydub>=0.25.0
+tqdm>=4.31.0
+
+# --- edit-video/tests ---
+pytest>=7.0.0

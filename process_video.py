@@ -16,6 +16,7 @@ import googleapiclient.http
 from googleapiclient.errors import HttpError
 import json
 from dotenv import load_dotenv
+from video_preview import confirm_video_preview
 load_dotenv()
 
 BASE_DIR = "/Users/tainguyen/Programing/Python/Money-Tool"
@@ -332,7 +333,37 @@ def health_check_api(youtube):
     except Exception as e:
         print(f"❌ Health Check Failed: {repr(e)}")
         return False
-    
+
+
+def telegram_manifest_path(group_id):
+    sanitized = re.sub(r"[^\w.-]", "_", group_id.lstrip("-"))
+    return os.path.join(BASE_DIR, "telegram-skills", "cache", f"{sanitized}.json")
+
+
+def load_telegram_batch_files(group_id, video_dir):
+    manifest_path = telegram_manifest_path(group_id)
+    if not os.path.exists(manifest_path):
+        return []
+
+    with open(manifest_path, "r", encoding="utf-8") as file_handle:
+        manifest = json.load(file_handle)
+
+    batch_files = []
+    for entry in manifest.get("files", {}).values():
+        local_path = entry.get("local_path")
+        if not local_path:
+            continue
+
+        if os.path.isabs(local_path):
+            full_path = local_path
+        else:
+            full_path = os.path.join(video_dir, os.path.basename(local_path))
+
+        if os.path.isfile(full_path):
+            batch_files.append(full_path)
+
+    return batch_files
+
 # =========================
 # MAIN
 # =========================
@@ -340,6 +371,21 @@ def health_check_api(youtube):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--type", required=True, choices=["gym", "lazytyping", "guitar"])
+    parser.add_argument(
+        "--preview",
+        action="store_true",
+        help="Xem trước video sau khi dựng xong; Next để upload, Cancel để dừng",
+    )
+    parser.add_argument(
+        "--force-download",
+        action="store_true",
+        help="Bỏ qua cache Telegram và tải lại toàn bộ batch",
+    )
+    parser.add_argument(
+        "--force-cleanup",
+        action="store_true",
+        help="Chạy strong_cleanup.sh để xóa cache video (reset hoàn toàn)",
+    )
     args = parser.parse_args()
 
     cfg = CONFIG[args.type]
@@ -367,7 +413,10 @@ def main():
             sys.exit(1)
 
     # 1. CLEANUP
-    run(f"bash {BASE_DIR}/strong_cleanup.sh")
+    if args.force_cleanup:
+        run(f"bash {BASE_DIR}/strong_cleanup.sh")
+    else:
+        run(f"bash {BASE_DIR}/light_cleanup.sh")
 
     # 2. YOUTUBE DATA
     items = get_playlist_videos(youtube, cfg["PLAYLIST_ID"])
@@ -378,28 +427,39 @@ def main():
 
     # 3. DOWNLOAD TELEGRAM
     TELEGRAM_PYTHON = sys.executable
-    run(
-        f"{TELEGRAM_PYTHON} download-files.py --group-id={cfg['GROUP_ID']} --marker-text={cfg['MARKER']}",
-        cwd=f"{BASE_DIR}/telegram-skills"
+    download_cmd = (
+        f"{TELEGRAM_PYTHON} download-files.py "
+        f"--group-id={cfg['GROUP_ID']} --marker-text={cfg['MARKER']}"
     )
+    if args.force_download:
+        download_cmd += " --force-download"
+    run(download_cmd, cwd=f"{BASE_DIR}/telegram-skills")
 
     video_dir = f"{BASE_DIR}/telegram-skills/videos"
     edit_dir = f"{BASE_DIR}/edit-video"
 
     os.makedirs(f"{edit_dir}/config-edit-video-with-scene/folder_videos", exist_ok=True)
 
+    batch_files = load_telegram_batch_files(cfg["GROUP_ID"], video_dir)
+    if not batch_files:
+        batch_files = [
+            os.path.join(video_dir, filename)
+            for filename in os.listdir(video_dir)
+            if os.path.isfile(os.path.join(video_dir, filename))
+        ]
+
     keep_count = 0
     normal_files = []
 
-    for f in os.listdir(video_dir):
-        src = os.path.join(video_dir, f)
+    for src in batch_files:
+        filename = os.path.basename(src)
 
-        if "keep" in f:
+        if "keep" in filename:
             run(f"cp '{src}' {edit_dir}/keep.mp4")
             keep_count += 1
         else:
             run(f"cp '{src}' {edit_dir}/config-edit-video-with-scene/folder_videos/")
-            normal_files.append(f)
+            normal_files.append(filename)
 
     if len(normal_files) == 0:
         print("❌ No videos")
@@ -439,10 +499,19 @@ config-edit-video-with-scene/folder_audios \
         run("mv output.mp4 final-with-keep.mp4", cwd=edit_dir)
         final_video = "final-with-keep.mp4"
 
+    final_video_path = os.path.join(edit_dir, final_video)
+
+    if args.preview:
+        print("\n👀 Mở cửa sổ xem trước video...")
+        if not confirm_video_preview(final_video_path, title=title_video):
+            print("🛑 Đã huỷ — bỏ qua upload YouTube, Threads và thông báo Telegram.")
+            sys.exit(0)
+        print("✅ Đã xác nhận — tiếp tục upload.")
+
     # 8. UPLOAD
     video_id = upload_video(
         youtube,
-        os.path.join(edit_dir, final_video),
+        final_video_path,
         title_video,
         next_pub,
         description=playlist_config["description"]
@@ -452,7 +521,7 @@ config-edit-video-with-scene/folder_audios \
 
     # 9. UPLOAD TO THREADS
     playwright_dir = f"{BASE_DIR}/playwright"
-    threads_video = os.path.join(edit_dir, final_video)
+    threads_video = final_video_path
     run(
         f'npx ts-node src/scenarios/threads-upload.ts --video "{threads_video}" --caption "{title_video}"',
         cwd=playwright_dir

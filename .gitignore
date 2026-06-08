@@ -8,3 +8,4 @@ edit-video
 token_cache.json
 data/
 media/
+__pycache__/
