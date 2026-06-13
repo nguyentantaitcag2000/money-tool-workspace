@@ -29,6 +29,50 @@ Khi dựng video, script `edit-video/edit-video-gym.py` **phân tích thời lư
 
 Khi video hơi ngắn so với scene (ví dụ 9s cần 10s), script sẽ **kéo dài nhẹ** thay vì ghép clip 1 giây bị tua nhanh. Ngưỡng mặc định: tối đa **2 giây** và **15%** thời lượng video (`--max-stretch-sec`, `--max-stretch-ratio`). Nếu thiếu quá nhiều (ví dụ 9s cần 14s), ghép video tiếp theo bình thường và **tái sử dụng** phần còn dư qua nhiều scene.
 
+## Ký hiệu trong tên file video
+
+Đặt ký hiệu trực tiếp trong tên file khi gửi video qua Telegram. Pipeline đọc tên file sau khi tải về.
+
+### Bảng ký hiệu
+
+| Ký hiệu | Ý nghĩa | Xử lý ở |
+|---------|---------|---------|
+| `keep` | Giữ nguyên tốc độ, ghép ở cuối video đã dựng | `process_video.py` |
+| `cs{N}` | Cắt **N giây đầu** (thay thế `--skip` mặc định) | `edit-video-gym.py` |
+| `ce{N}` | Cắt **N giây cuối** (thay thế `--trim-end` mặc định) | `edit-video-gym.py` |
+
+### Mặc định cắt đầu/cuối (khi không có `cs` / `ce`)
+
+Cấu hình trong `process_video.py` (`CUT_START` / `CUT_END`), truyền sang `edit-video-gym.py` qua `--skip` / `--trim-end`:
+
+| `--type` | `CUT_START` | `CUT_END` |
+|----------|-------------|-----------|
+| `gym` | 8 giây | 1 giây |
+| `lazytyping` | 5 giây | 1 giây |
+| `guitar` | 5 giây | 1 giây |
+
+Có `cs10` trong tên → cắt đúng **10 giây đầu**, không cộng thêm mặc định. Không có `cs` → dùng giá trị mặc định theo `--type` ở bảng trên.
+
+### Quy tắc
+
+- Có thể kết hợp: `2024-06-01_cs8_ce2.mp4`
+- `cs0` / `ce0` hợp lệ — không cắt phần tương ứng
+- So khớp không phân biệt hoa thường (`CS10` = `cs10`)
+- Mỗi batch chỉ được **một** file có `keep`; nhiều hơn pipeline sẽ dừng lỗi
+- Video `keep` không qua bước tua nhanh/ghép nhạc — chỉ nối vào cuối bằng `concat-videos.py`
+
+### Ví dụ
+
+| Tên file | Cắt đầu | Cắt cuối | Ghi chú |
+|----------|---------|----------|---------|
+| `gym-2024-06-01.mp4` | 8s (mặc định gym) | 1s | Như hiện tại |
+| `gym-2024-06-01_cs5.mp4` | 5s | 1s | Bấm máy muộn hơn |
+| `gym-2024-06-01_ce0.mp4` | 8s | 0s | Không cắt cuối |
+| `2024-06-01_cs10_ce2.mp4` | 10s | 2s | Ghi đè cả đầu và cuối |
+| `outro_keep.mp4` | — | — | Giữ nguyên, ghép cuối |
+
+`cs` / `ce` ảnh hưởng thời lượng dùng cho smart audio — nên kiểm tra bằng `--dry-run` trước khi render thật (xem mục **Kiểm tra nhanh** bên dưới).
+
 ## Loại trừ bài hát khỏi danh sách audio
 
 ### File config
@@ -117,4 +161,4 @@ python3 edit-video-gym.py \
   --dry-run
 ```
 
-Khi có bài bị loại, log sẽ hiện dòng `🚫 Loại trừ N bài hát: ...`. Khi smart audio bật, log còn hiện bài được chọn và top 3 điểm khớp.
+Khi có bài bị loại, log sẽ hiện dòng `🚫 Loại trừ N bài hát: ...`. Khi smart audio bật, log còn hiện bài được chọn và top 3 điểm khớp. Với file có `cs` / `ce`, log còn hiện `skip=... (cs10)` / `trim=... (ce2)` hoặc `(default)` cho từng video.

@@ -32,7 +32,8 @@ CONFIG = {
         "PLAYLIST_ID": "PL6vRTrd-KXO7_kb8LgOyF8zdnzLQ6i60T",
         "PUBLISH_HOUR": 7,
         "OUTPUT": "final-gym.mp4",
-        "SKIP": "8"
+        "CUT_START": "8",
+        "CUT_END": "1",
     },
     "lazytyping": {
         "GROUP_ID": "-5200249717",
@@ -40,7 +41,8 @@ CONFIG = {
         "PLAYLIST_ID": "PL6vRTrd-KXO7K18TJb_sel2-rtJxU_8WJ",
         "PUBLISH_HOUR": 9,
         "OUTPUT": "final-lazy.mp4",
-        "SKIP": "5"
+        "CUT_START": "5",
+        "CUT_END": "1",
     },
     "guitar": {
         "GROUP_ID": "-5261026148",
@@ -48,7 +50,8 @@ CONFIG = {
         "PLAYLIST_ID": "PL6vRTrd-KXO7L6pqBPGA5fDtOQ_MDnOBI",
         "PUBLISH_HOUR": 8,
         "OUTPUT": "final-guitar.mp4",
-        "SKIP": "5"
+        "CUT_START": "5",
+        "CUT_END": "1",
     }
 }
 
@@ -557,8 +560,8 @@ python edit-video-gym.py \
 config-edit-video-with-scene/folder_videos \
 config-edit-video-with-scene/folder_audios \
 --output {cfg['OUTPUT']} \
---skip {cfg['SKIP']} \
---trim-end 1 \
+--skip {cfg['CUT_START']} \
+--trim-end {cfg['CUT_END']} \
 --type {args.type} \
 --config-dir {CONFIG_DIR} \
 --texts '[{{"text":"{day_label}","start":2,"duration":5,"font_size":120,"x":"(w-text_w)/2","y":"(h-text_h)/2"}}]'
