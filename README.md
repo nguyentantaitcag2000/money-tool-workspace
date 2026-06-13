@@ -38,8 +38,8 @@ Khi video hơi ngắn so với scene (ví dụ 9s cần 10s), script sẽ **kéo
 | Ký hiệu | Ý nghĩa | Xử lý ở |
 |---------|---------|---------|
 | `keep` | Giữ nguyên tốc độ, ghép ở cuối video đã dựng | `process_video.py` |
-| `cs{N}` | Cắt **N giây đầu** (thay thế `--skip` mặc định) | `edit-video-gym.py` |
-| `ce{N}` | Cắt **N giây cuối** (thay thế `--trim-end` mặc định) | `edit-video-gym.py` |
+| `cs{N}` | Cắt **N giây đầu** (thay thế `CUT_START` mặc định) | `edit-video-gym.py` (video thường), `process_video.py` (video `keep`) |
+| `ce{N}` | Cắt **N giây cuối** (thay thế `CUT_END` mặc định) | `edit-video-gym.py` (video thường), `process_video.py` (video `keep`) |
 
 ### Mặc định cắt đầu/cuối (khi không có `cs` / `ce`)
 
@@ -60,6 +60,7 @@ Có `cs10` trong tên → cắt đúng **10 giây đầu**, không cộng thêm 
 - So khớp không phân biệt hoa thường (`CS10` = `cs10`)
 - Mỗi batch chỉ được **một** file có `keep`; nhiều hơn pipeline sẽ dừng lỗi
 - Video `keep` không qua bước tua nhanh/ghép nhạc — chỉ nối vào cuối bằng `concat-videos.py`
+- Video `keep` **không** dùng `CUT_START` / `CUT_END` mặc định; chỉ cắt khi có `cs` / `ce` trong tên file
 
 ### Ví dụ
 
@@ -70,6 +71,8 @@ Có `cs10` trong tên → cắt đúng **10 giây đầu**, không cộng thêm 
 | `gym-2024-06-01_ce0.mp4` | 8s | 0s | Không cắt cuối |
 | `2024-06-01_cs10_ce2.mp4` | 10s | 2s | Ghi đè cả đầu và cuối |
 | `outro_keep.mp4` | — | — | Giữ nguyên, ghép cuối |
+| `outro_keep_ce3.mp4` | — | 3s | Keep, cắt cuối theo `ce3` |
+| `outro_keep_cs5_ce2.mp4` | 5s | 2s | Keep, cắt đầu/cuối theo marker |
 
 `cs` / `ce` ảnh hưởng thời lượng dùng cho smart audio — nên kiểm tra bằng `--dry-run` trước khi render thật (xem mục **Kiểm tra nhanh** bên dưới).
 
