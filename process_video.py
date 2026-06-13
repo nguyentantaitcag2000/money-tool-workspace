@@ -23,6 +23,10 @@ load_dotenv()
 
 BASE_DIR = "/Users/tainguyen/Programing/Python/Money-Tool"
 CONFIG_DIR = os.path.join(BASE_DIR, "config")
+EDIT_VIDEO_DIR = os.path.join(BASE_DIR, "edit-video")
+sys.path.insert(0, EDIT_VIDEO_DIR)
+
+from filename_markers import has_trim_markers, trim_video_to_file
 secret_path = os.getenv("CLIENT_SECRET_PATH", "client_secret.json")
 TOKEN_CACHE_PATH = os.path.join(BASE_DIR, "token_cache.json")
 CONFIG = {
@@ -503,7 +507,7 @@ def main():
     run(download_cmd, cwd=f"{BASE_DIR}/telegram-skills")
 
     video_dir = f"{BASE_DIR}/telegram-skills/videos"
-    edit_dir = f"{BASE_DIR}/edit-video"
+    edit_dir = EDIT_VIDEO_DIR
 
     os.makedirs(f"{edit_dir}/config-edit-video-with-scene/folder_videos", exist_ok=True)
 
@@ -533,7 +537,17 @@ def main():
         filename = os.path.basename(src)
 
         if "keep" in filename:
-            run(f"cp '{src}' {edit_dir}/keep.mp4")
+            keep_dst = f"{edit_dir}/keep.mp4"
+            try:
+                overrides = trim_video_to_file(
+                    src, keep_dst, filename, default_skip=0, default_trim_end=0
+                )
+            except (subprocess.CalledProcessError, ValueError) as exc:
+                print(f"❌ Không thể xử lý keep video {filename}: {exc}")
+                sys.exit(1)
+            if has_trim_markers(overrides):
+                parts = [token for token in (overrides["skip"], overrides["trim_end"]) if token]
+                print(f"✂️  keep video: {filename} → đã cắt theo {', '.join(parts)}")
             keep_count += 1
         else:
             run(f"cp '{src}' {edit_dir}/config-edit-video-with-scene/folder_videos/")
