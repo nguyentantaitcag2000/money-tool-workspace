@@ -40,6 +40,18 @@ Khi video hơi ngắn so với scene (ví dụ 9s cần 10s), script sẽ **kéo
 | `keep` | Giữ nguyên tốc độ, ghép ở cuối video đã dựng | `process_video.py` |
 | `cs{N}` | Cắt **N giây đầu** (thay thế `CUT_START` mặc định) | `edit-video-gym.py` (video thường), `process_video.py` (video `keep`) |
 | `ce{N}` | Cắt **N giây cuối** (thay thế `CUT_END` mặc định) | `edit-video-gym.py` (video thường), `process_video.py` (video `keep`) |
+| `sp{N}` | Tốc độ phát **N% so với gốc** (vd. `sp200` = 2x, `sp50` = 0.5x); bỏ auto khớp scene | `edit-video-gym.py` |
+
+### Tốc độ phát (`sp{N}`)
+
+| Ký hiệu | Ý nghĩa |
+|---------|---------|
+| *(không có `sp`)* | Auto khớp scene (speed-up / stretch như mặc định) |
+| `sp100` | 100% — 1x cố định, không auto |
+| `sp200` | 200% — nhanh 2x; 20s nguồn → 10s trên timeline |
+| `sp50` | 50% — chậm 2x; 10s nguồn → 20s trên timeline |
+
+Marker cũ `su` / `st` / `sr` **không còn** được hỗ trợ — dùng `sp{N}` thay thế.
 
 ### Mặc định cắt đầu/cuối (khi không có `cs` / `ce`)
 
@@ -55,26 +67,27 @@ Có `cs10` trong tên → cắt đúng **10 giây đầu**, không cộng thêm 
 
 ### Quy tắc
 
-- Có thể kết hợp: `2024-06-01_cs8_ce2.mp4`
+- Có thể kết hợp: `2024-06-01_cs8_sp200.mp4`
 - `cs0` / `ce0` hợp lệ — không cắt phần tương ứng
-- So khớp không phân biệt hoa thường (`CS10` = `cs10`)
+- So khớp không phân biệt hoa thường (`CS10` = `cs10`, `SP200` = `sp200`)
 - Mỗi batch chỉ được **một** file có `keep`; nhiều hơn pipeline sẽ dừng lỗi
 - Video `keep` không qua bước tua nhanh/ghép nhạc — chỉ nối vào cuối bằng `concat-videos.py`
 - Video `keep` **không** dùng `CUT_START` / `CUT_END` mặc định; chỉ cắt khi có `cs` / `ce` trong tên file
+- `sp` **không** áp dụng cho video `keep` (clip không qua timeline planner)
 
 ### Ví dụ
 
-| Tên file | Cắt đầu | Cắt cuối | Ghi chú |
-|----------|---------|----------|---------|
-| `gym-2024-06-01.mp4` | 8s (mặc định gym) | 1s | Như hiện tại |
-| `gym-2024-06-01_cs5.mp4` | 5s | 1s | Bấm máy muộn hơn |
-| `gym-2024-06-01_ce0.mp4` | 8s | 0s | Không cắt cuối |
-| `2024-06-01_cs10_ce2.mp4` | 10s | 2s | Ghi đè cả đầu và cuối |
-| `outro_keep.mp4` | — | — | Giữ nguyên, ghép cuối |
-| `outro_keep_ce3.mp4` | — | 3s | Keep, cắt cuối theo `ce3` |
-| `outro_keep_cs5_ce2.mp4` | 5s | 2s | Keep, cắt đầu/cuối theo marker |
+| Tên file | Cắt đầu | Cắt cuối | Tốc độ | Ghi chú |
+|----------|---------|----------|--------|---------|
+| `gym-2024-06-01.mp4` | 8s | 1s | Auto | Như hiện tại |
+| `gym_sp200.mp4` | 8s | 1s | 200% | Luôn 2x; 20s nguồn → 10s timeline |
+| `gym_sp50.mp4` | 8s | 1s | 50% | Luôn 0.5x; 10s nguồn → 20s timeline |
+| `gym_sp100.mp4` | 8s | 1s | 100% | 1x cố định, không auto |
+| `2024-06-01_cs10_ce2.mp4` | 10s | 2s | Auto | Ghi đè cắt đầu/cuối |
+| `outro_keep.mp4` | — | — | — | Giữ nguyên, ghép cuối |
+| `outro_keep_ce3.mp4` | — | 3s | — | Keep, cắt cuối theo `ce3` |
 
-`cs` / `ce` ảnh hưởng thời lượng dùng cho smart audio — nên kiểm tra bằng `--dry-run` trước khi render thật (xem mục **Kiểm tra nhanh** bên dưới).
+`cs` / `ce` / `sp` ảnh hưởng kế hoạch dựng và smart audio — nên kiểm tra bằng `--dry-run` trước khi render thật (log hiện `speed=sp200` hoặc `(default)` cho từng file; xem mục **Kiểm tra nhanh** bên dưới).
 
 ## Loại trừ bài hát khỏi danh sách audio
 
@@ -164,4 +177,4 @@ python3 edit-video-gym.py \
   --dry-run
 ```
 
-Khi có bài bị loại, log sẽ hiện dòng `🚫 Loại trừ N bài hát: ...`. Khi smart audio bật, log còn hiện bài được chọn và top 3 điểm khớp. Với file có `cs` / `ce`, log còn hiện `skip=... (cs10)` / `trim=... (ce2)` hoặc `(default)` cho từng video.
+Khi có bài bị loại, log sẽ hiện dòng `🚫 Loại trừ N bài hát: ...`. Khi smart audio bật, log còn hiện bài được chọn và top 3 điểm khớp. Với file có marker, log còn hiện `skip`/`trim`/`speed` (vd. `speed=sp200` hoặc `(default)`) cho từng video.
