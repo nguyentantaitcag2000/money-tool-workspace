@@ -43,6 +43,10 @@ CONFIG = {
         "GROUP_ID": "-5200249717",
         "MARKER": "#SUCCESS_MARKER_LAZYTYPING_V1#",
         "PLAYLIST_ID": "PL6vRTrd-KXO7K18TJb_sel2-rtJxU_8WJ",
+        "PLAYLIST_IDS": [
+            "PL6vRTrd-KXO7K18TJb_sel2-rtJxU_8WJ",
+            "PLDdq2pqA5Ij4",
+        ],
         "PUBLISH_HOUR": 9,
         "OUTPUT": "final-lazy.mp4",
         "CUT_START": "5",
@@ -378,6 +382,10 @@ def add_to_playlist(youtube, video_id, playlist_id):
         }
     ).execute()
 
+
+def get_target_playlist_ids(cfg):
+    return cfg.get("PLAYLIST_IDS") or [cfg["PLAYLIST_ID"]]
+
 def check_secret_exists(path):
     if not os.path.exists(path):
         print(f"❌ Health Check Failed: File {path} not found.")
@@ -615,15 +623,17 @@ config-edit-video-with-scene/folder_audios \
         description=playlist_config["description"]
     )
 
-    add_to_playlist(youtube, video_id, cfg["PLAYLIST_ID"])
+    for playlist_id in get_target_playlist_ids(cfg):
+        add_to_playlist(youtube, video_id, playlist_id)
+        print(f"📁 Added to playlist: {playlist_id}")
 
     # 9. UPLOAD TO THREADS
-    playwright_dir = f"{BASE_DIR}/playwright"
-    threads_video = final_video_path
-    run(
-        f'npx ts-node src/scenarios/threads-upload.ts --video "{threads_video}" --caption "{title_video}"',
-        cwd=playwright_dir
-    )
+    # playwright_dir = f"{BASE_DIR}/playwright"
+    # threads_video = final_video_path
+    # run(
+    #     f'npx ts-node src/scenarios/threads-upload.ts --video "{threads_video}" --caption "{title_video}"',
+    #     cwd=playwright_dir
+    # )
 
     # 10. NOTIFY
     run(
