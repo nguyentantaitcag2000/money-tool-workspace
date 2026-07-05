@@ -3,3 +3,5 @@ Website: https://lazycodet.com/lazytyping
 LazyTyping is a tool-based website that I created to help practice typing skills while also effectively learning foreign language vocabulary. I’ll use my own progress as proof to show that this tool truly works and can help you improve yourself. Don’t believe it? Just follow my journey and see if you still have any doubts.
 
 ⏱️ Typing practice time today: 20 minutes
+
+Keyboard: Sofle v2

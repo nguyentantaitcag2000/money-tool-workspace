@@ -448,6 +448,9 @@ def load_telegram_batch_files(group_id, video_dir):
 # =========================
 
 def main():
+    started_at = datetime.now().astimezone()
+    start_perf = time.perf_counter()
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--type", required=True, choices=["gym", "lazytyping", "guitar"])
     parser.add_argument(
@@ -641,7 +644,15 @@ config-edit-video-with-scene/folder_audios \
         cwd=f"{BASE_DIR}/telegram-skills"
     )
 
+    finished_at = datetime.now().astimezone()
+    elapsed_seconds = int(time.perf_counter() - start_perf)
+    elapsed_hours, remainder = divmod(elapsed_seconds, 3600)
+    elapsed_minutes, elapsed_secs = divmod(remainder, 60)
+
     print("✅ DONE")
+    print(f"🕒 Bắt đầu lúc:   {started_at.isoformat(sep=' ', timespec='seconds')}")
+    print(f"🏁 Hoàn tất lúc: {finished_at.isoformat(sep=' ', timespec='seconds')}")
+    print(f"⏱️ Tổng thời gian: {elapsed_hours:02d}:{elapsed_minutes:02d}:{elapsed_secs:02d}")
 
 
 if __name__ == "__main__":
