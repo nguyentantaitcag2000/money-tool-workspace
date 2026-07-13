@@ -179,21 +179,179 @@ def get_latest_video_info(items):
 
     for item in items:
         title = item["snippet"]["title"]
-        if re.search(r'Day\s+(\d+)', title):
+        if extract_day_numbers(title):
             return title
 
     return None
+
+def get_day_video_entries(items, limit=15):
+    entries = []
+
+    for item in items:
+        title = item["snippet"]["title"]
+        days = extract_day_numbers(title)
+        if not days:
+            continue
+
+        entries.append({
+            "title": title,
+            "published_at": item["snippet"]["publishedAt"],
+            "days": days,
+            "max_day": max(days),
+        })
+
+    entries.sort(key=lambda x: x["published_at"], reverse=True)
+    return entries[:limit]
+
+def print_plan_report(
+    playlist_type,
+    cfg,
+    playlist_config,
+    playlist_id,
+    items,
+    latest_title,
+    batch_files,
+    normal_files,
+    day_label,
+    title_video,
+    next_pub,
+    recent_limit=15,
+    all_playlist_snapshots=None,
+):
+    print("\n" + "=" * 60)
+    print(f"DRY RUN — {playlist_type}")
+    print("=" * 60)
+
+    if all_playlist_snapshots:
+        print("\n📺 YouTube playlists:")
+        for snapshot in all_playlist_snapshots:
+            print(f"\n   Playlist: {snapshot['playlist_id']}")
+            print(f"   Tổng video: {len(snapshot['items'])}")
+            print(f"   Latest (script logic): {snapshot['latest_title'] or '(không có)'}")
+            day_entries = get_day_video_entries(snapshot["items"], limit=recent_limit)
+            if not day_entries:
+                print("   ⚠️ Không có video 'Day' trong playlist này.")
+                continue
+
+            print(f"   {len(day_entries)} video gần nhất có 'Day' (theo publishedAt):")
+            for index, entry in enumerate(day_entries, start=1):
+                marker = ""
+                if (
+                    snapshot["playlist_id"] == playlist_id
+                    and entry["title"] == latest_title
+                ):
+                    marker = "  ← script chọn làm latest"
+                print(
+                    f"   {index}. [{entry['published_at']}] {entry['title']}"
+                    f"  (days={entry['days']}, max={entry['max_day']}){marker}"
+                )
+    else:
+        print(f"\n📺 YouTube playlist: {playlist_id}")
+        print(f"   Tổng video trong playlist: {len(items)}")
+
+        day_entries = get_day_video_entries(items, limit=recent_limit)
+        if not day_entries:
+            print("   ⚠️ Không tìm thấy video nào có 'Day' trong tiêu đề.")
+        else:
+            print(f"   {len(day_entries)} video gần nhất có 'Day' (theo publishedAt):")
+            for index, entry in enumerate(day_entries, start=1):
+                marker = "  ← script chọn làm latest" if entry["title"] == latest_title else ""
+                print(
+                    f"   {index}. [{entry['published_at']}] {entry['title']}"
+                    f"  (days={entry['days']}, max={entry['max_day']}){marker}"
+                )
+
+    print(f"\n🎯 Latest title (script): {latest_title or '(không có)'}")
+    if latest_title:
+        max_day, extracted_suffix = extract_day_and_suffix(latest_title)
+        all_days = extract_day_numbers(latest_title)
+        print(f"   Day numbers trong title: {all_days}")
+        print(f"   Max day (dùng để tính): {max_day}")
+        print(f"   Next start day: {max_day + 1}")
+        print(f"   Suffix từ title: {extracted_suffix or '(trống)'}")
+    else:
+        max_day = 0
+        print("   Next start day: 1 (không có video tham chiếu)")
+
+    config_suffix = playlist_config.get("suffix")
+    if config_suffix and latest_title:
+        _, extracted_suffix = extract_day_and_suffix(latest_title)
+        if extracted_suffix != config_suffix:
+            print(
+                f"   ⚠️ Suffix config ({config_suffix}) "
+                f"khác suffix từ YouTube ({extracted_suffix or '(trống)'})"
+            )
+
+    print(f"\n📁 Telegram batch ({len(batch_files)} file trong manifest):")
+    if not batch_files:
+        print("   ⚠️ Manifest rỗng hoặc thiếu file local.")
+    else:
+        for src in batch_files:
+            filename = os.path.basename(src)
+            dates = extract_dates([filename])
+            date_label = ", ".join(sorted(dates)) if dates else "(không nhận dạng được ngày)"
+            role = "keep" if "keep" in filename else "normal"
+            print(f"   - [{role}] {filename}  →  {date_label}")
+
+    print(f"\n🎬 Normal files dùng để đếm ngày ({len(normal_files)}):")
+    if normal_files:
+        unique_dates = sorted(extract_dates(normal_files))
+        print(f"   Unique dates ({len(unique_dates)}): {', '.join(unique_dates) or '(không có)'}")
+        for filename in normal_files:
+            print(f"   - {filename}")
+    else:
+        print("   (không có)")
+
+    print("\n🏷️  Title sẽ được tạo:")
+    print(f"   Overlay text: {day_label}")
+    print(f"   Full title:   {title_video}")
+
+    print("\n📅 Lịch publish:")
+    if next_pub:
+        print(f"   Scheduled: {next_pub}")
+    else:
+        print("   IMMEDIATE (public ngay)")
+
+    extra_playlist_ids = [
+        pid for pid in get_target_playlist_ids(cfg) if pid != playlist_id
+    ]
+    if extra_playlist_ids and not all_playlist_snapshots:
+        print("\nℹ️  Playlist phụ (không dùng để tính Day, chỉ upload):")
+        for pid in extra_playlist_ids:
+            print(f"   - {pid}")
+
+    print("\n(Dry run — không cleanup, không download, không render, không upload)")
+    print("=" * 60 + "\n")
+
+def collect_playlist_snapshots(youtube, cfg):
+    snapshots = []
+    for playlist_id in get_target_playlist_ids(cfg):
+        playlist_items = get_playlist_videos(youtube, playlist_id)
+        snapshots.append({
+            "playlist_id": playlist_id,
+            "items": playlist_items,
+            "latest_title": get_latest_video_info(playlist_items),
+        })
+    return snapshots
 
 # =========================
 # TITLE
 # =========================
 
+def extract_day_numbers(title):
+    day_part = title.split(" - ", 1)[0].strip()
+    match = re.match(r'^Day\s+(.+)$', day_part, re.IGNORECASE)
+    if not match:
+        return []
+
+    return [int(number) for number in re.findall(r'\d+', match.group(1))]
+
 def extract_day_and_suffix(title):
-    m = re.search(r'Day\s+(\d+)', title)
-    if not m:
+    days = extract_day_numbers(title)
+    if not days:
         raise Exception("Invalid title format")
 
-    max_day = int(m.group(1))
+    max_day = max(days)
     suffix = title.split(" - ", 1)[1] if " - " in title else ""
     return max_day, suffix
 
@@ -215,13 +373,15 @@ def extract_dates(files):
 def generate_title(latest_title, files, suffix):
     max_day, _ = extract_day_and_suffix(latest_title) if latest_title else (0, None)
     dates = extract_dates(files)
+    num_days = max(len(dates), 1)
 
     next_day = max_day + 1
 
-    if len(dates) == 1:
+    if num_days == 1:
         day_label = f"Day {next_day}"
     else:
-        day_label = f"Day {next_day}, {next_day + 1}"
+        day_numbers = ", ".join(str(next_day + i) for i in range(num_days))
+        day_label = f"Day {day_numbers}"
 
     return day_label, f"{day_label} - {suffix}"
 
@@ -237,7 +397,7 @@ def compute_next_publish(items, publish_hour):
 
     for item in items:
         title = item["snippet"]["title"]
-        if not re.search(r'Day\s+(\d+)', title):
+        if not extract_day_numbers(title):
             continue
         dt = datetime.fromisoformat(item["snippet"]["publishedAt"].replace("Z", "+00:00"))
         used_dates.add(dt.date())
@@ -468,7 +628,22 @@ def main():
         action="store_true",
         help="Chạy strong_cleanup.sh để xóa cache video (reset hoàn toàn)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Chỉ kiểm tra: in playlist YouTube, batch Telegram và title sẽ tạo; không cleanup/download/render/upload",
+    )
+    parser.add_argument(
+        "--skip-download",
+        action="store_true",
+        help="Bỏ qua bước tải Telegram, dùng manifest/cache hiện có",
+    )
     args = parser.parse_args()
+
+    if args.dry_run and args.force_cleanup:
+        print("⚠️ --dry-run bỏ qua --force-cleanup.")
+    if args.dry_run and args.force_download:
+        print("⚠️ --dry-run bỏ qua --force-download.")
 
     cfg = CONFIG[args.type]
     playlist_config = load_playlist_config(args.type)
@@ -495,10 +670,11 @@ def main():
             sys.exit(1)
 
     # 1. CLEANUP
-    if args.force_cleanup:
-        run(f"bash {BASE_DIR}/strong_cleanup.sh")
-    else:
-        run(f"bash {BASE_DIR}/light_cleanup.sh")
+    if not args.dry_run:
+        if args.force_cleanup:
+            run(f"bash {BASE_DIR}/strong_cleanup.sh")
+        else:
+            run(f"bash {BASE_DIR}/light_cleanup.sh")
 
     # 2. YOUTUBE DATA
     items = get_playlist_videos(youtube, cfg["PLAYLIST_ID"])
@@ -509,13 +685,18 @@ def main():
 
     # 3. DOWNLOAD TELEGRAM
     TELEGRAM_PYTHON = sys.executable
-    download_cmd = (
-        f"{TELEGRAM_PYTHON} download-files.py "
-        f"--group-id={cfg['GROUP_ID']} --marker-text={cfg['MARKER']}"
-    )
-    if args.force_download:
-        download_cmd += " --force-download"
-    run(download_cmd, cwd=f"{BASE_DIR}/telegram-skills")
+    if not args.dry_run and not args.skip_download:
+        download_cmd = (
+            f"{TELEGRAM_PYTHON} download-files.py "
+            f"--group-id={cfg['GROUP_ID']} --marker-text={cfg['MARKER']}"
+        )
+        if args.force_download:
+            download_cmd += " --force-download"
+        run(download_cmd, cwd=f"{BASE_DIR}/telegram-skills")
+    elif args.skip_download and not args.dry_run:
+        print("⏭️  Bỏ qua download Telegram — dùng manifest hiện có.")
+    else:
+        print("⏭️  Dry run — bỏ qua download Telegram, dùng manifest hiện có.")
 
     video_dir = f"{BASE_DIR}/telegram-skills/videos"
     edit_dir = EDIT_VIDEO_DIR
@@ -523,12 +704,14 @@ def main():
     os.makedirs(f"{edit_dir}/config-edit-video-with-scene/folder_videos", exist_ok=True)
 
     batch_files = load_telegram_batch_files(cfg["GROUP_ID"], video_dir)
-    if not batch_files:
+    if not batch_files and not args.dry_run:
         print(
             "❌ Không có video batch từ Telegram (manifest rỗng hoặc thiếu file).\n"
             "   Chạy lại download hoặc dùng --force-download nếu cần."
         )
         sys.exit(1)
+    if not batch_files and args.dry_run:
+        print("⚠️ Dry run: không có batch Telegram — chỉ hiển thị phần YouTube/title giả định.")
 
     local_video_count = sum(
         1
@@ -548,6 +731,10 @@ def main():
         filename = os.path.basename(src)
 
         if "keep" in filename:
+            if args.dry_run:
+                keep_count += 1
+                continue
+
             keep_dst = f"{edit_dir}/keep.mp4"
             try:
                 overrides = trim_video_to_file(
@@ -561,10 +748,11 @@ def main():
                 print(f"✂️  keep video: {filename} → đã cắt theo {', '.join(parts)}")
             keep_count += 1
         else:
-            run(f"cp '{src}' {edit_dir}/config-edit-video-with-scene/folder_videos/")
+            if not args.dry_run:
+                run(f"cp '{src}' {edit_dir}/config-edit-video-with-scene/folder_videos/")
             normal_files.append(filename)
 
-    if len(normal_files) == 0:
+    if len(normal_files) == 0 and not args.dry_run:
         print("❌ No videos")
         sys.exit(1)
 
@@ -577,6 +765,24 @@ def main():
 
     # 5. SCHEDULE
     next_pub = compute_next_publish(items, cfg["PUBLISH_HOUR"])
+
+    if args.dry_run:
+        playlist_snapshots = collect_playlist_snapshots(youtube, cfg)
+        print_plan_report(
+            args.type,
+            cfg,
+            playlist_config,
+            cfg["PLAYLIST_ID"],
+            items,
+            latest_title,
+            batch_files,
+            normal_files,
+            day_label,
+            title_video,
+            next_pub,
+            all_playlist_snapshots=playlist_snapshots,
+        )
+        sys.exit(0)
 
     # 6. EDIT VIDEO
     run(
